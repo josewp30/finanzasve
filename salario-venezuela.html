@@ -1,0 +1,2094 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinanzasVE</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --navy:#0b1120;--navy2:#131d30;--navy3:#1a2540;
+  --border:#223058;
+  --gold:#c8a84b;--gold2:#e8c878;
+  --teal:#29b8b0;--red:#e05c5c;--green:#44c97e;--blue:#4a8ff0;
+  --text:#dce4f0;--text2:#8fa0be;
+  --r:10px;--sh:0 2px 16px rgba(0,0,0,.35);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{font-size:15px;}
+body{font-family:'IBM Plex Sans',sans-serif;background:var(--navy);color:var(--text);min-height:100vh;}
+
+/* TOP BAR */
+.topbar{position:sticky;top:0;z-index:200;background:var(--navy2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;height:60px;}
+.logo{font-size:1.1rem;font-weight:600;letter-spacing:.06em;color:#fff;}
+.logo span{color:var(--gold);}
+.topbar-right{display:flex;align-items:center;gap:.75rem;}
+.bcv-pill{display:flex;align-items:center;gap:.5rem;background:var(--navy3);border:1px solid var(--border);border-radius:8px;padding:.35rem .85rem;cursor:pointer;transition:border-color .2s;}
+.bcv-pill:hover{border-color:var(--gold);}
+.pulse{width:7px;height:7px;border-radius:50%;background:var(--gold);animation:blink 2.5s ease-in-out infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
+.bcv-pill .lbl{font-size:.72rem;color:var(--text2);letter-spacing:.04em;}
+.bcv-pill .rate{font-family:'IBM Plex Mono',monospace;font-size:.88rem;color:var(--gold2);font-weight:500;}
+.bcv-pill .dt{font-size:.68rem;color:var(--text2);}
+.sync-indicator{display:flex;align-items:center;gap:.4rem;font-size:.72rem;color:var(--text2);padding:.3rem .7rem;border-radius:6px;background:var(--navy3);border:1px solid var(--border);}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--text2);}
+.sync-dot.ok{background:var(--green);}
+.sync-dot.err{background:var(--red);}
+.sync-dot.loading{background:var(--gold);animation:blink 1s infinite;}
+
+/* LAYOUT */
+.layout{display:flex;min-height:calc(100vh - 60px);}
+.sidebar{width:210px;flex-shrink:0;background:var(--navy2);border-right:1px solid var(--border);padding:1.2rem .75rem;display:flex;flex-direction:column;gap:.25rem;}
+.nav-sec{font-size:.65rem;font-weight:600;letter-spacing:.1em;color:var(--text2);text-transform:uppercase;padding:.9rem .9rem .3rem;opacity:.6;}
+.nav-btn{display:flex;align-items:center;gap:.75rem;padding:.65rem .9rem;border-radius:8px;border:none;background:transparent;color:var(--text2);font-family:'IBM Plex Sans',sans-serif;font-size:.83rem;font-weight:500;cursor:pointer;transition:all .18s;text-align:left;width:100%;letter-spacing:.01em;}
+.nav-btn .ic{font-size:1rem;width:20px;text-align:center;}
+.nav-btn:hover{background:var(--navy3);color:var(--text);}
+.nav-btn.active{background:rgba(200,168,75,.12);color:var(--gold2);border-left:3px solid var(--gold);padding-left:calc(.9rem - 3px);}
+
+/* CONTENT */
+.content{flex:1;padding:2rem;overflow-y:auto;max-width:1100px;}
+.page{display:none;animation:fade .22s ease;}
+.page.active{display:block;}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.pg-title{font-size:1.35rem;font-weight:600;color:#fff;margin-bottom:.3rem;letter-spacing:-.01em;}
+.pg-sub{font-size:.82rem;color:var(--text2);margin-bottom:1.6rem;}
+
+/* CARD */
+.card{background:var(--navy2);border:1px solid var(--border);border-radius:var(--r);padding:1.4rem;margin-bottom:1.2rem;}
+.card-lbl{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:1rem;}
+
+/* GRIDS */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:1rem;}
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:.85rem;}
+@media(max-width:860px){.g2,.g3,.g4{grid-template-columns:1fr 1fr;}}
+@media(max-width:560px){.g2,.g3,.g4{grid-template-columns:1fr;}}
+
+/* KPI */
+.kpi{background:var(--navy2);border:1px solid var(--border);border-radius:var(--r);padding:1.1rem 1.2rem;position:relative;overflow:hidden;}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--ac,var(--gold));}
+.kpi-lbl{font-size:.68rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);margin-bottom:.55rem;}
+.kpi-val{font-family:'IBM Plex Mono',monospace;font-size:1.15rem;font-weight:500;color:#fff;line-height:1;}
+.kpi-sub{font-family:'IBM Plex Mono',monospace;font-size:.75rem;color:var(--gold2);margin-top:.3rem;}
+
+/* FORM */
+.fld{margin-bottom:1rem;}
+.fld label{display:block;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text2);margin-bottom:.4rem;}
+input[type=number],input[type=text],input[type=date],select,textarea{width:100%;background:var(--navy3);border:1px solid var(--border);border-radius:8px;padding:.6rem .85rem;color:var(--text);font-family:'IBM Plex Mono',monospace;font-size:.88rem;outline:none;transition:border-color .18s;appearance:none;}
+input:focus,select:focus,textarea:focus{border-color:var(--gold);}
+input::placeholder{color:var(--text2);font-family:'IBM Plex Sans',sans-serif;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:.4rem;padding:.6rem 1.2rem;border-radius:8px;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:.82rem;font-weight:600;cursor:pointer;transition:all .18s;letter-spacing:.03em;}
+.btn-p{background:var(--gold);color:#0b1120;}
+.btn-p:hover{background:var(--gold2);transform:translateY(-1px);box-shadow:0 4px 14px rgba(200,168,75,.3);}
+.btn-s{background:var(--navy3);border:1px solid var(--border);color:var(--text);}
+.btn-s:hover{border-color:var(--gold);color:var(--gold2);}
+.btn-d{background:rgba(224,92,92,.12);border:1px solid rgba(224,92,92,.3);color:var(--red);}
+.btn-d:hover{background:rgba(224,92,92,.22);}
+.btn-t{background:rgba(41,184,176,.15);border:1px solid rgba(41,184,176,.3);color:var(--teal);}
+.btn-t:hover{background:rgba(41,184,176,.25);}
+.btn-sm{padding:.35rem .75rem;font-size:.75rem;}
+
+/* CALC ROW */
+.calc-row{display:flex;gap:.7rem;background:var(--navy3);border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem;margin-top:.6rem;}
+.cc{flex:1;}
+.cc .cl{font-size:.67rem;color:var(--text2);font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:.25rem;}
+.cc .cv{font-family:'IBM Plex Mono',monospace;font-size:.9rem;color:#fff;}
+.cc .cu{font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--teal);}
+
+/* TABLE */
+.tbl{width:100%;border-collapse:collapse;font-size:.84rem;}
+.tbl th{text-align:left;padding:.45rem .6rem;font-size:.67rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text2);border-bottom:1px solid var(--border);}
+.tbl td{padding:.6rem .6rem;border-bottom:1px solid rgba(255,255,255,.04);}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr.tot td{border-top:1px solid var(--gold);font-weight:600;color:var(--gold2);padding-top:.8rem;}
+
+/* WEEK */
+.week-card{background:var(--navy2);border:1px solid var(--border);border-left:3px solid var(--ac,var(--gold));border-radius:var(--r);padding:1.1rem 1.3rem;margin-bottom:.9rem;}
+.week-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.8rem;}
+.week-name{font-size:.78rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;}
+.week-range{font-size:.7rem;color:var(--text2);margin-top:.1rem;}
+.wt-bs{font-family:'IBM Plex Mono',monospace;font-size:1rem;font-weight:500;color:#fff;text-align:right;}
+.wt-usd{font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--teal);text-align:right;}
+.pay-row{display:flex;justify-content:space-between;align-items:center;padding:.45rem 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.pay-row:last-child{border-bottom:none;}
+.pay-name{font-size:.83rem;color:var(--text);display:flex;align-items:center;gap:.5rem;}
+.pay-dot{width:5px;height:5px;border-radius:50%;}
+.pay-sub{font-size:.7rem;color:var(--text2);}
+.pay-amt{text-align:right;}
+.pay-bs{font-family:'IBM Plex Mono',monospace;font-size:.88rem;font-weight:500;}
+.pay-usd{font-family:'IBM Plex Mono',monospace;font-size:.7rem;color:var(--teal);}
+
+/* PROGRESS */
+.prog-wrap{height:6px;background:var(--navy3);border-radius:999px;overflow:hidden;margin-top:.5rem;}
+.prog-fill{height:100%;border-radius:999px;transition:width .5s ease;}
+
+/* BADGE */
+.bdg{display:inline-flex;align-items:center;padding:.15rem .55rem;border-radius:4px;font-size:.67rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;}
+.bdg-t{background:rgba(41,184,176,.12);color:var(--teal);}
+.bdg-g{background:rgba(68,201,126,.12);color:var(--green);}
+.bdg-r{background:rgba(224,92,92,.12);color:var(--red);}
+.bdg-gold{background:rgba(200,168,75,.12);color:var(--gold2);}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;padding:1rem;}
+.overlay.open{display:flex;}
+.modal{background:var(--navy2);border:1px solid var(--border);border-radius:12px;padding:1.8rem;width:100%;max-width:480px;box-shadow:var(--sh);max-height:90vh;overflow-y:auto;}
+.modal h3{font-size:1rem;font-weight:600;margin-bottom:1.2rem;}
+
+/* INFO BOXES */
+.info{background:rgba(200,168,75,.06);border:1px solid rgba(200,168,75,.2);border-radius:8px;padding:.8rem 1rem;font-size:.8rem;color:var(--gold2);line-height:1.55;margin-bottom:1.2rem;}
+.info.t{background:rgba(41,184,176,.06);border-color:rgba(41,184,176,.2);color:var(--teal);}
+.info.r{background:rgba(224,92,92,.06);border-color:rgba(224,92,92,.2);color:var(--red);}
+.info.g{background:rgba(68,201,126,.06);border-color:rgba(68,201,126,.2);color:var(--green);}
+
+/* UTIL */
+.hr{height:1px;background:var(--border);margin:1.2rem 0;}
+.mono{font-family:'IBM Plex Mono',monospace;}
+.right{text-align:right;}
+.muted{color:var(--text2);}
+.small{font-size:.78rem;}
+.xs{font-size:.7rem;}
+.teal{color:var(--teal);}
+.gold{color:var(--gold2);}
+.red{color:var(--red);}
+.green{color:var(--green);}
+.blue{color:var(--blue);}
+
+/* TASA HISTORY LIST */
+.tasa-row{display:flex;align-items:center;justify-content:space-between;background:var(--navy3);border-radius:8px;padding:.6rem 1rem;margin-bottom:.4rem;}
+.tasa-row.active-tasa{border:1px solid var(--gold);background:rgba(200,168,75,.07);}
+
+/* SALARY HISTORY */
+.sal-card{background:var(--navy3);border-radius:8px;padding:1rem 1.2rem;margin-bottom:.6rem;border-left:3px solid var(--blue);}
+.sal-card.latest{border-left-color:var(--green);}
+
+/* LOADING OVERLAY */
+.loading-overlay{position:fixed;inset:0;z-index:900;background:rgba(11,17,32,.85);display:none;align-items:center;justify-content:center;flex-direction:column;gap:1rem;}
+.loading-overlay.open{display:flex;}
+.spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* MOBILE */
+@media(max-width:700px){
+  .sidebar{width:56px;padding:1rem .4rem;}
+  .sidebar .nav-lbl,.nav-sec{display:none;}
+  .nav-btn{justify-content:center;padding:.65rem;}
+  .nav-btn.active{border-left-width:0;border-bottom:2px solid var(--gold);}
+  .content{padding:1rem;}
+  .topbar-right .sync-indicator{display:none;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div class="loading-overlay" id="loading-overlay">
+  <div class="spinner"></div>
+  <div style="font-size:.85rem;color:var(--text2);" id="loading-msg">Conectando con Google Sheets...</div>
+</div>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="logo">FINANZAS<span>VE</span></div>
+  <div class="topbar-right">
+    <div class="sync-indicator" id="sync-indicator">
+      <div class="sync-dot" id="sync-dot"></div>
+      <span id="sync-lbl">Offline</span>
+    </div>
+    <div class="bcv-pill" onclick="openModal('modal-bcv')" title="Click para gestionar tasa BCV">
+      <div class="pulse"></div>
+      <span class="lbl">BCV</span>
+      <span class="rate" id="hdr-rate">— Bs./$</span>
+      <span class="dt" id="hdr-dt"></span>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="nav-sec">Principal</div>
+    <button class="nav-btn active" onclick="nav(this,'config')"><span class="ic">⚙</span><span class="nav-lbl">Configuración</span></button>
+    <button class="nav-btn" onclick="nav(this,'resumen')"><span class="ic">◈</span><span class="nav-lbl">Resumen</span></button>
+    <div class="nav-sec">Pagos</div>
+    <button class="nav-btn" onclick="nav(this,'semanal')"><span class="ic">▦</span><span class="nav-lbl">Calendario</span></button>
+    <div class="nav-sec">Análisis</div>
+    <button class="nav-btn" onclick="nav(this,'gastos')"><span class="ic">↓</span><span class="nav-lbl">Gastos</span></button>
+    <button class="nav-btn" onclick="nav(this,'fijos')"><span class="ic">📌</span><span class="nav-lbl">Fijos</span></button>
+    <button class="nav-btn" onclick="nav(this,'ahorro')"><span class="ic">◎</span><span class="nav-lbl">Ahorro</span></button>
+    <div class="nav-sec">Histórico</div>
+    <button class="nav-btn" onclick="nav(this,'htasas')"><span class="ic">📈</span><span class="nav-lbl">Tasas</span></button>
+    <button class="nav-btn" onclick="nav(this,'hsalarios')"><span class="ic">💼</span><span class="nav-lbl">Salarios</span></button>
+  </nav>
+
+  <main class="content">
+
+    <!-- ═══════════════════════════════════════════════
+         CONFIG
+    ════════════════════════════════════════════════ -->
+    <div class="page active" id="page-config">
+      <div class="pg-title">Configuración de Ingresos</div>
+      <div class="pg-sub">Define tu estructura salarial. Al guardar, se registra un snapshot con la tasa BCV del día.</div>
+
+      <div class="g2">
+        <div class="card">
+          <div class="card-lbl">Tasa BCV Activa</div>
+          <div class="fld"><label>Bs. por 1 USD</label>
+            <input type="number" id="inp-bcv" placeholder="Ej: 98.50" step="0.01" oninput="liveCalc()">
+          </div>
+          <div class="fld"><label>Fecha valor</label><input type="date" id="inp-dt"></div>
+          <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+            <button class="btn btn-t" onclick="fetchAction(false)">⟳ Obtener tasa BCV</button>
+            <button class="btn btn-p" onclick="saveBCV()">✓ Guardar tasa</button>
+          </div>
+          <div id="cfg-status" style="display:none;margin-top:.9rem;font-size:.8rem;padding:.7rem 1rem;border-radius:8px;"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-lbl">Salario Mensual</div>
+          <div class="fld"><label>Salario total (Bs.)</label>
+            <input type="number" id="inp-sal" placeholder="0.00" step="0.01" oninput="liveCalc()">
+          </div>
+          <div class="calc-row">
+            <div class="cc"><div class="cl">1ª Quincena · día 10</div><div class="cv" id="c-q1">— Bs.</div><div class="cu" id="c-q1u">—</div></div>
+            <div class="cc"><div class="cl">2ª Quincena · día 25</div><div class="cv" id="c-q2">— Bs.</div><div class="cu" id="c-q2u">—</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-lbl">Bonos</div>
+          <div class="fld"><label>Bono 1 — pago mensual (Bs.)</label>
+            <input type="number" id="inp-b1" placeholder="0.00" step="0.01" oninput="liveCalc()">
+          </div>
+          <div class="fld"><label>Bono 2 — total mensual (Bs.)</label>
+            <input type="number" id="inp-b2" placeholder="0.00" step="0.01" oninput="liveCalc()">
+          </div>
+          <div class="calc-row">
+            <div class="cc"><div class="cl">Bono 2 · parte 1</div><div class="cv" id="c-b2a">— Bs.</div><div class="cu" id="c-b2au">—</div></div>
+            <div class="cc"><div class="cl">Bono 2 · parte 2</div><div class="cv" id="c-b2b">— Bs.</div><div class="cu" id="c-b2bu">—</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-lbl">Cesta Ticket & Ayuda</div>
+          <div class="fld"><label>Cesta Ticket (USD) — pagada en Bs.</label>
+            <input type="number" id="inp-cu" placeholder="0.00" step="0.01" oninput="liveCalc()">
+          </div>
+          <div class="calc-row">
+            <div class="cc"><div class="cl">Cesta en Bs.</div><div class="cv" id="c-cbs">— Bs.</div><div class="cu" id="c-cusd">—</div></div>
+            <div class="cc"><div class="cl">Ayuda 65%</div><div class="cv" id="c-ay">— Bs.</div><div class="cu" id="c-ayu">—</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-lbl">Notas del período</div>
+        <div class="fld" style="margin:0;">
+          <textarea id="inp-notas" placeholder="Ej: Aumento de sueldo, cambio de contrato..." rows="2" style="resize:vertical;"></textarea>
+        </div>
+      </div>
+
+      <button class="btn btn-p" onclick="calcularTodo()" style="padding:.75rem 2.2rem;font-size:.92rem;">
+        Calcular y Guardar →
+      </button>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         RESUMEN
+    ════════════════════════════════════════════════ -->
+    <div class="page" id="page-resumen">
+      <div class="pg-title">Resumen Mensual</div>
+      <div class="pg-sub">Consolidado de ingresos. <span style="color:var(--teal);">USD primario</span> · <span style="color:var(--gold2);">Bs. referencia</span></div>
+      <!-- Selector de tasa histórica -->
+      <div class="card" style="margin-bottom:1rem;">
+        <div class="card-lbl">Vista histórica — elegir tasa</div>
+        <div style="display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;">
+          <select id="sel-tasa-hist" style="max-width:280px;" onchange="aplicarTasaHistorica()">
+            <option value="">Tasa activa (hoy)</option>
+          </select>
+          <span class="xs muted" id="sel-tasa-info"></span>
+        </div>
+      </div>
+      <div class="g4" id="kpi-grid" style="margin-bottom:1.2rem;"></div>
+      <div class="card">
+        <div class="card-lbl">Desglose de Conceptos</div>
+        <table class="tbl">
+          <thead><tr><th>Concepto</th><th class="right">USD</th><th class="right">Bs. (tasa selec.)</th><th class="right">Día / Semana</th></tr></thead>
+          <tbody id="tbl-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         SEMANAL
+    ════════════════════════════════════════════════ -->
+    <div class="page" id="page-semanal">
+      <div class="pg-title">Calendario de Pagos</div>
+      <div class="pg-sub">Distribución semanal de ingresos. USD primario · Bs. referencia.</div>
+      <div id="week-blocks"></div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         GASTOS VARIABLES
+    ════════════════════════════════════════════════ -->
+    <div class="page" id="page-gastos">
+      <div class="pg-title">Registro de Gastos</div>
+      <div class="pg-sub">Los gastos en USD se anclan a la tasa BCV del día de registro. Los USD son inmutables.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="card-lbl">Nuevo Gasto</div>
+          <div class="fld"><label>Descripción</label>
+            <input type="text" id="g-desc" placeholder="Almuerzo, Transporte...">
+          </div>
+          <!-- Currency toggle -->
+          <div class="fld">
+            <label>Moneda de ingreso</label>
+            <div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:.7rem;">
+              <button id="g-cur-usd" onclick="setCur('usd')" style="flex:1;padding:.55rem;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;background:var(--teal);color:#0b1120;transition:all .15s;">$ USD</button>
+              <button id="g-cur-bs"  onclick="setCur('bs')"  style="flex:1;padding:.55rem;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;background:var(--navy3);color:var(--text2);transition:all .15s;">Bs.</button>
+            </div>
+            <div id="g-inp-usd-wrap">
+              <div style="position:relative;">
+                <span style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--teal);font-family:'IBM Plex Mono',monospace;font-size:.85rem;font-weight:600;">$</span>
+                <input type="number" id="g-m-usd" placeholder="0.00" step="0.01" oninput="syncCurrency('usd')" style="padding-left:1.8rem;">
+              </div>
+              <div id="g-conv-bs" style="margin-top:.4rem;font-size:.75rem;color:var(--text2);font-family:'IBM Plex Mono',monospace;">≈ — Bs. (tasa del día)</div>
+            </div>
+            <div id="g-inp-bs-wrap" style="display:none;">
+              <div style="position:relative;">
+                <span style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--gold2);font-family:'IBM Plex Mono',monospace;font-size:.75rem;font-weight:600;">Bs.</span>
+                <input type="number" id="g-m-bs" placeholder="0.00" step="0.01" oninput="syncCurrency('bs')" style="padding-left:2.5rem;">
+              </div>
+              <div id="g-conv-usd" style="margin-top:.4rem;font-size:.75rem;color:var(--text2);font-family:'IBM Plex Mono',monospace;">≈ — USD</div>
+            </div>
+          </div>
+          <div class="g2" style="gap:.7rem;">
+            <div class="fld" style="margin:0;"><label>Fecha</label>
+              <input type="date" id="g-f" onchange="onFechaGastoChange()">
+            </div>
+            <div class="fld" style="margin:0;"><label>Categoría</label>
+              <select id="g-c">
+                <option>Alimentación</option><option>Transporte</option><option>Servicios</option>
+                <option>Salud</option><option>Educación</option><option>Entretenimiento</option>
+                <option>Ropa</option><option>Hogar</option><option>Otro</option>
+              </select>
+            </div>
+          </div>
+          <!-- Tasa del día — se actualiza al cambiar fecha -->
+          <div id="g-tasa-box" style="margin-top:.7rem;border-radius:8px;padding:.6rem .85rem;display:none;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem;">
+              <div>
+                <div id="g-tasa-lbl" style="font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin-bottom:.2rem;"></div>
+                <div id="g-tasa-val" style="font-family:'IBM Plex Mono',monospace;font-size:.9rem;font-weight:500;"></div>
+              </div>
+              <div id="g-tasa-manual-wrap" style="display:none;">
+                <div style="display:flex;gap:.4rem;align-items:center;">
+                  <input type="number" id="g-tasa-manual" placeholder="Bs./USD" step="0.01"
+                    style="width:110px;padding:.4rem .6rem;font-size:.8rem;" oninput="onTasaManualInput()">
+                  <button class="btn btn-t btn-sm" onclick="guardarTasaManualGasto()">Guardar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-p" id="g-btn-add" onclick="addGasto()" style="width:100%;justify-content:center;margin-top:.8rem;" disabled>+ Agregar Gasto</button>
+        </div>
+
+        <div class="card">
+          <div class="card-lbl">Resumen por Semana</div>
+          <div id="g-sem" style="display:flex;flex-direction:column;gap:.5rem;"></div>
+          <div class="hr"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span class="muted small">Total mes</span>
+            <div style="text-align:right;">
+              <div class="mono teal" id="g-tot-usd-main" style="font-size:1.1rem;">— USD</div>
+              <div class="mono gold xs" id="g-tot-bs-sub">— Bs.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-lbl" style="display:flex;justify-content:space-between;align-items:center;">
+          Historial de Gastos
+          <button class="btn btn-d btn-sm" onclick="clearG()">Borrar todo</button>
+        </div>
+        <!-- Filtro mes -->
+        <div style="display:flex;gap:.7rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center;">
+          <input type="month" id="g-mes-filtro" style="max-width:180px;" onchange="cargarGastosMes()">
+          <span class="xs muted">Filtra por mes para cargar desde Sheets</span>
+        </div>
+        <div id="g-list"></div>
+        <div id="g-empty" class="muted small" style="text-align:center;padding:1.5rem;">Sin gastos registrados.</div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         GASTOS FIJOS
+    ════════════════════════════════════════════════ -->
+    <div class="page" id="page-fijos">
+      <div class="pg-title">Gastos Fijos</div>
+      <div class="pg-sub">Gastos recurrentes en USD. Se actualizan automáticamente con la tasa BCV activa cada mes.</div>
+      <div class="g2">
+        <div class="card">
+          <div class="card-lbl">Nuevo Gasto Fijo</div>
+          <div class="fld"><label>Descripción</label>
+            <input type="text" id="gf-desc" placeholder="Netflix, Gym, Internet...">
+          </div>
+          <div class="fld"><label>Monto (USD)</label>
+            <div style="position:relative;">
+              <span style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--teal);font-family:'IBM Plex Mono',monospace;font-size:.85rem;font-weight:600;">$</span>
+              <input type="number" id="gf-monto" placeholder="0.00" step="0.01" oninput="syncFijo()" style="padding-left:1.8rem;">
+            </div>
+            <div id="gf-conv" style="margin-top:.4rem;font-size:.75rem;color:var(--text2);font-family:'IBM Plex Mono',monospace;">≈ — Bs. a tasa activa</div>
+          </div>
+          <div class="fld"><label>Categoría</label>
+            <select id="gf-cat">
+              <option>Servicios</option><option>Entretenimiento</option><option>Salud</option>
+              <option>Educación</option><option>Hogar</option><option>Transporte</option><option>Otro</option>
+            </select>
+          </div>
+          <button class="btn btn-p" onclick="addGastoFijo()" style="width:100%;justify-content:center;">+ Agregar Gasto Fijo</button>
+        </div>
+
+        <div class="card">
+          <div class="card-lbl">Resumen de Gastos Fijos</div>
+          <div style="margin-bottom:1rem;">
+            <div class="xs muted" style="margin-bottom:.3rem;">Total mensual en USD</div>
+            <div class="mono teal" id="gf-total-usd" style="font-size:1.5rem;">$ 0.00</div>
+            <div class="mono gold xs" id="gf-total-bs" style="margin-top:.2rem;">Bs. 0.00 a tasa activa</div>
+          </div>
+          <div class="hr"></div>
+          <div class="xs muted">💡 Estos gastos se suman al análisis de ahorro como carga fija mensual.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-lbl">Lista de Gastos Fijos</div>
+        <div id="gf-list"></div>
+        <div id="gf-empty" class="muted small" style="text-align:center;padding:1.5rem;">Sin gastos fijos registrados.</div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         AHORRO
+    ════════════════════════════════════════════════ -->
+    <div class="page" id="page-ahorro">
+      <div class="pg-title">Ahorro & Análisis</div>
+      <div class="pg-sub">Moneda principal: <span style="color:var(--teal);font-weight:600;">USD</span> · Bs. como referencia · Meta: 40%</div>
+
+      <div class="g3" style="margin-bottom:1.2rem;">
+        <div class="kpi" style="--ac:var(--green)">
+          <div class="kpi-lbl">Ingresos Totales</div>
+          <div class="kpi-val green" id="a-iusd">— USD</div>
+          <div class="kpi-sub" id="a-ibs">— Bs.</div>
+        </div>
+        <div class="kpi" style="--ac:var(--red)">
+          <div class="kpi-lbl">Total Gastos</div>
+          <div class="kpi-val red" id="a-gusd">— USD</div>
+          <div class="kpi-sub" id="a-gbs">— Bs.</div>
+        </div>
+        <div class="kpi" style="--ac:var(--teal)">
+          <div class="kpi-lbl">Saldo Disponible</div>
+          <div class="kpi-val teal" id="a-susd">— USD</div>
+          <div class="kpi-sub" id="a-sbs">— Bs.</div>
+        </div>
+      </div>
+
+      <div class="g2">
+        <div class="card">
+          <div class="card-lbl">Meta de Ahorro — 40%</div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.3rem;">
+            <span class="small muted">Meta (40%)</span>
+            <div style="text-align:right;">
+              <div class="mono teal" id="a-meta-usd" style="font-size:.95rem;">— USD</div>
+              <div class="mono gold xs" id="a-meta-bs">— Bs.</div>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.6rem;">
+            <span class="small muted">Ahorro estimado</span>
+            <div style="text-align:right;">
+              <div class="mono" id="a-act-usd" style="font-size:.95rem;">— USD</div>
+              <div class="mono gold xs" id="a-act-bs">— Bs.</div>
+            </div>
+          </div>
+          <div class="prog-wrap"><div class="prog-fill" id="a-bar" style="background:linear-gradient(90deg,var(--teal),var(--green));width:0%"></div></div>
+          <div style="display:flex;justify-content:space-between;margin-top:.4rem;">
+            <span class="xs muted" id="a-pct">0%</span>
+            <span class="xs muted">Meta: 40%</span>
+          </div>
+          <div class="hr"></div>
+          <div id="a-adv" style="font-size:.82rem;line-height:1.6;color:var(--text2);"></div>
+        </div>
+        <div class="card">
+          <div class="card-lbl">Gastos por Categoría (USD)</div>
+          <div style="position:relative;height:220px;"><canvas id="ch-cat"></canvas></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-lbl">Flujo Mensual (USD)</div>
+        <div style="position:relative;height:280px;"><canvas id="ch-flow"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-lbl">Gastos por Semana</div>
+        <div style="position:relative;height:220px;"><canvas id="ch-week"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-lbl">Composición de Ingresos (USD)</div>
+        <div style="position:relative;height:220px;"><canvas id="ch-ing"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         HISTÓRICO TASAS
+    ════════════════════════════════════════════════ -->
+    <div class="page" id="page-htasas">
+      <div class="pg-title">Histórico de Tasas BCV</div>
+      <div class="pg-sub">Consulta o busca tasas de días anteriores. Úsalas para ver cómo estaban tus finanzas en esa fecha.</div>
+
+      <div class="g2">
+        <div class="card">
+          <div class="card-lbl">Buscar tasa por fecha</div>
+          <div class="fld"><label>Fecha a consultar</label>
+            <input type="date" id="ht-fecha">
+          </div>
+          <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+            <button class="btn btn-t" onclick="buscarTasaHistorica()">🔍 Buscar en API</button>
+            <button class="btn btn-s" onclick="guardarTasaManual()">+ Guardar manual</button>
+          </div>
+          <div id="ht-status" style="display:none;margin-top:.9rem;font-size:.8rem;padding:.7rem 1rem;border-radius:8px;"></div>
+        </div>
+        <div class="card">
+          <div class="card-lbl">Tasa activa</div>
+          <div style="margin-bottom:.5rem;">
+            <div class="xs muted">Tasa actual del sistema</div>
+            <div class="mono gold" style="font-size:1.6rem;" id="ht-activa">—</div>
+            <div class="xs muted" id="ht-activa-fecha">—</div>
+          </div>
+          <div class="hr"></div>
+          <div class="xs muted">💡 Haz clic en cualquier tasa del historial para usarla como referencia en el Resumen.</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-lbl" style="display:flex;justify-content:space-between;align-items:center;">
+          Historial de Tasas
+          <button class="btn btn-t btn-sm" onclick="cargarTasasHistoricas()">⟳ Actualizar</button>
+        </div>
+        <div id="ht-list" style="max-height:500px;overflow-y:auto;">
+          <div class="muted small" style="text-align:center;padding:1.5rem;">Cargando...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════
+         HISTÓRICO SALARIOS
+    ════════════════════════════════════════════════ -->
+    <div class="page" id="page-hsalarios">
+      <div class="pg-title">Historial de Salarios</div>
+      <div class="pg-sub">Cada vez que guardas tu configuración se registra un snapshot con la tasa BCV del día.</div>
+
+      <div class="g3" style="margin-bottom:1.2rem;">
+        <div class="kpi" style="--ac:var(--blue)">
+          <div class="kpi-lbl">Salario Actual (USD)</div>
+          <div class="kpi-val blue" id="hs-sal-usd">—</div>
+          <div class="kpi-sub" id="hs-sal-bs">—</div>
+        </div>
+        <div class="kpi" style="--ac:var(--gold)">
+          <div class="kpi-lbl">Tasa en último aumento</div>
+          <div class="kpi-val gold" id="hs-tasa">—</div>
+          <div class="kpi-sub" id="hs-tasa-fecha">—</div>
+        </div>
+        <div class="kpi" style="--ac:var(--green)">
+          <div class="kpi-lbl">Total con bonos (USD)</div>
+          <div class="kpi-val green" id="hs-total-usd">—</div>
+          <div class="kpi-sub" id="hs-total-bs">—</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-lbl" style="display:flex;justify-content:space-between;align-items:center;">
+          Historial de Cambios Salariales
+          <button class="btn btn-t btn-sm" onclick="cargarHistorialSalarios()">⟳ Actualizar</button>
+        </div>
+        <div id="hs-list">
+          <div class="muted small" style="text-align:center;padding:1.5rem;">Cargando...</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-lbl">Evolución Salarial en USD</div>
+        <div style="position:relative;height:260px;"><canvas id="ch-sal"></canvas></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     MODAL: BCV
+════════════════════════════════════════════════ -->
+<div class="overlay" id="modal-bcv">
+  <div class="modal">
+    <h3>⟳ Gestionar Tasa BCV</h3>
+    <div class="info t">La tasa se guarda en Google Sheets. Puedes obtenerla automáticamente o ingresarla manualmente.</div>
+    <div class="fld"><label>Tasa BCV (Bs. / USD)</label>
+      <input type="number" id="m-bcv" placeholder="0.00" step="0.01">
+    </div>
+    <div class="fld"><label>Fecha valor</label>
+      <input type="date" id="m-dt">
+    </div>
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+      <button class="btn btn-t" onclick="fetchAction(true)">⟳ Obtener tasa BCV</button>
+      <button class="btn btn-p" onclick="saveModal()">✓ Guardar</button>
+      <button class="btn btn-s" onclick="closeModal('modal-bcv')">Cancelar</button>
+    </div>
+    <div id="m-status" style="display:none;margin-top:.8rem;font-size:.8rem;padding:.6rem .9rem;border-radius:8px;"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+//  CONFIGURACIÓN GOOGLE SHEETS
+// ═══════════════════════════════════════════════════════════
+// ── Supabase ──────────────────────────────────────────────────────────────
+const SB_URL   = 'https://tdcpdjhwvpkrxgmnpftv.supabase.co';
+const SB_KEY   = 'sb_publishable_ytx1M7anayE7g7_SnGQCxw_ZMjYNsnM';
+const SB_HDR   = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+
+// ═══════════════════════════════════════════════════════════
+//  STATE LOCAL (caché + fallback)
+// ═══════════════════════════════════════════════════════════
+let S = {
+  bcv: 0, bcvDate: '',
+  salario: 0, b1: 0, b2: 0, cusd: 0,
+  gastos: [],         // caché del mes actual
+  gastosFijos: [],    // caché
+  tasasHistoricas: [], // caché
+  salarios: [],       // caché historial
+  tasaVista: 0,       // tasa seleccionada para vista histórica
+};
+let CH = {};
+const LS_KEY = 'fve4';
+
+const lsLoad = () => { try { const d = localStorage.getItem(LS_KEY); if (d) S = { ...S, ...JSON.parse(d) }; } catch {} };
+const lsSave = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch {} };
+
+// ═══════════════════════════════════════════════════════════
+//  SUPABASE API LAYER
+// ═══════════════════════════════════════════════════════════
+function setSyncState(state, msg) {
+  const dot = document.getElementById('sync-dot');
+  const lbl = document.getElementById('sync-lbl');
+  dot.className = 'sync-dot ' + (state === 'ok' ? 'ok' : state === 'err' ? 'err' : 'loading');
+  lbl.textContent = msg || (state === 'ok' ? 'Sincronizado' : state === 'err' ? 'Sin conexión' : 'Sincronizando...');
+}
+
+// GET — select rows con filtros opcionales (objeto {col: val})
+async function sbGet(tabla, filtros = {}) {
+  const url = new URL(`${SB_URL}/rest/v1/${tabla}`);
+  url.searchParams.set('select', '*');
+  Object.entries(filtros).forEach(([k, v]) => url.searchParams.set(k, `eq.${v}`));
+  const r = await fetch(url.toString(), { headers: SB_HDR, signal: AbortSignal.timeout(10000) });
+  if (!r.ok) { const t = await r.text(); throw new Error(`sbGet ${tabla}: ${r.status} ${t}`); }
+  return r.json(); // devuelve array directo
+}
+
+// INSERT — devuelve el registro insertado con id real
+async function sbInsert(tabla, datos) {
+  const r = await fetch(`${SB_URL}/rest/v1/${tabla}`, {
+    method: 'POST',
+    headers: SB_HDR,
+    body: JSON.stringify(datos),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!r.ok) { const t = await r.text(); throw new Error(`sbInsert ${tabla}: ${r.status} ${t}`); }
+  const rows = await r.json();
+  return Array.isArray(rows) ? rows[0] : rows;
+}
+
+// UPSERT — insert o update por conflict en columna única
+async function sbUpsert(tabla, datos, onConflict = 'id') {
+  const url = new URL(`${SB_URL}/rest/v1/${tabla}`);
+  url.searchParams.set('on_conflict', onConflict);
+  const r = await fetch(url.toString(), {
+    method: 'POST',
+    headers: { ...SB_HDR, 'Prefer': 'return=representation,resolution=merge-duplicates' },
+    body: JSON.stringify(datos),
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!r.ok) { const t = await r.text(); throw new Error(`sbUpsert ${tabla}: ${r.status} ${t}`); }
+  const rows = await r.json();
+  return Array.isArray(rows) ? rows[0] : rows;
+}
+
+// DELETE — borra por id
+async function sbDelete(tabla, id) {
+  const url = new URL(`${SB_URL}/rest/v1/${tabla}`);
+  url.searchParams.set('id', `eq.${id}`);
+  const r = await fetch(url.toString(), {
+    method: 'DELETE',
+    headers: SB_HDR,
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!r.ok) { const t = await r.text(); throw new Error(`sbDelete ${tabla}: ${r.status} ${t}`); }
+  return true;
+}
+
+// Compat wrappers — mantienen el mismo contrato que el código que llama a apiGet/apiPost
+async function apiGet(accion, params = {}) {
+  if (accion === 'init')           return { status: 'ok', data: { ok: true } };
+  if (accion === 'getTasas')       return { status: 'ok', data: await sbGet('tasas_bcv') };
+  if (accion === 'getSalarios')    return { status: 'ok', data: await sbGet('salarios') };
+  if (accion === 'getGastosFijos') return { status: 'ok', data: await sbGet('gastos_fijos', { activo: true }) };
+  if (accion === 'getConfig') {
+    const rows = await sbGet('config');
+    const cfg = {};
+    rows.forEach(r => { cfg[r.clave] = r.valor; });
+    return { status: 'ok', data: cfg };
+  }
+  if (accion === 'getGastos') {
+    if (params.mes) {
+      // Supabase: filtro por rango — usa parámetros separados con nombre distinto
+      const url = new URL(`${SB_URL}/rest/v1/gastos`);
+      url.searchParams.set('select', '*');
+      url.searchParams.set('fecha', `gte.${params.mes}-01`);
+      url.searchParams.append('fecha', `lte.${params.mes}-31`);
+      url.searchParams.set('order', 'fecha.desc');
+      const r = await fetch(url.toString(), { headers: SB_HDR, signal: AbortSignal.timeout(10000) });
+      if (!r.ok) throw new Error('getGastos: ' + r.status);
+      return { status: 'ok', data: await r.json() };
+    }
+    // Sin filtro — todos los gastos ordenados por fecha desc
+    const url = new URL(`${SB_URL}/rest/v1/gastos`);
+    url.searchParams.set('select', '*');
+    url.searchParams.set('order', 'fecha.desc');
+    const r = await fetch(url.toString(), { headers: SB_HDR, signal: AbortSignal.timeout(10000) });
+    if (!r.ok) throw new Error('getGastos all: ' + r.status);
+    return { status: 'ok', data: await r.json() };
+  }
+  throw new Error('apiGet acción desconocida: ' + accion);
+}
+
+async function apiPost(accion, body = {}) {
+  if (accion === 'saveTasa') {
+    const row = await sbUpsert('tasas_bcv',
+      { fecha: body.fecha, tasa: parseFloat(body.tasa), fuente: body.fuente || 'BCV Oficial' },
+      'fecha'
+    );
+    return { status: 'ok', data: { saved: true, fecha: row.fecha, tasa: row.tasa } };
+  }
+  if (accion === 'saveSalario') {
+    const row = await sbInsert('salarios', {
+      fecha: body.fecha, tasa_dia: +body.tasa_dia,
+      salario_bs: +body.salario_bs, salario_usd: +body.salario_usd,
+      bono1_bs: +body.bono1_bs, bono1_usd: +body.bono1_usd,
+      bono2_bs: +body.bono2_bs, bono2_usd: +body.bono2_usd,
+      cesta_usd: +body.cesta_usd, cesta_bs: +body.cesta_bs,
+      ayuda_bs: +body.ayuda_bs, ayuda_usd: +body.ayuda_usd,
+      total_bs: +body.total_bs, total_usd: +body.total_usd,
+      notas: body.notas || '',
+    });
+    return { status: 'ok', data: { saved: true, id: row.id } };
+  }
+  if (accion === 'saveGasto') {
+    const row = await sbInsert('gastos', {
+      fecha: body.fecha, descripcion: body.descripcion,
+      categoria: body.categoria || 'Otro',
+      monto_usd: +body.monto_usd, tasa_dia: +body.tasa_dia,
+      monto_bs_dia: +body.monto_bs_dia, tipo: body.tipo || 'variable',
+    });
+    return { status: 'ok', data: { saved: true, id: row.id } };
+  }
+  if (accion === 'deleteGasto') {
+    await sbDelete('gastos', body.id);
+    return { status: 'ok', data: { deleted: true, id: body.id } };
+  }
+  if (accion === 'saveGastoFijo') {
+    const row = await sbInsert('gastos_fijos', {
+      descripcion: body.descripcion, categoria: body.categoria || 'Hogar',
+      monto_usd: +body.monto_usd, activo: true,
+    });
+    return { status: 'ok', data: { saved: true, id: row.id } };
+  }
+  if (accion === 'deleteGastoFijo') {
+    await sbDelete('gastos_fijos', body.id);
+    return { status: 'ok', data: { deleted: true, id: body.id } };
+  }
+  if (accion === 'saveConfig') {
+    await sbUpsert('config',
+      { clave: body.clave, valor: String(body.valor), actualizado_en: new Date().toISOString() },
+      'clave'
+    );
+    return { status: 'ok', data: { saved: true } };
+  }
+  throw new Error('apiPost acción desconocida: ' + accion);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FORMAT
+// ═══════════════════════════════════════════════════════════
+const N = n => (parseFloat(n) || 0).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fBs = n => `Bs. ${N(n)}`;
+const fUSD = n => `$ ${N(n)}`;
+const bsFromUSD = (usd, tasa) => tasa > 0 ? usd * tasa : 0;
+const usdFromBs = (bs, tasa) => tasa > 0 ? bs / tasa : 0;
+
+function setEl(id, v) { const e = document.getElementById(id); if (e) e.textContent = v; }
+
+// ═══════════════════════════════════════════════════════════
+//  HEADER
+// ═══════════════════════════════════════════════════════════
+function updateHdr() {
+  document.getElementById('hdr-rate').textContent = S.bcv > 0 ? `Bs. ${N(S.bcv)} / $` : '— Bs./$';
+  document.getElementById('hdr-dt').textContent = S.bcvDate ? ` · ${S.bcvDate}` : '';
+}
+
+// ═══════════════════════════════════════════════════════════
+//  BCV API (dolarapi.com)
+// ═══════════════════════════════════════════════════════════
+async function fetchBCV() {
+  try {
+    const r = await fetch('https://ve.dolarapi.com/v1/dolares/oficial', { signal: AbortSignal.timeout(10000) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    const rate = parseFloat(d.promedio || d.venta || d.compra) || null;
+    const fecha = d.fechaActualizacion ? d.fechaActualizacion.split('T')[0] : '';
+    return { rate, fecha, fuente: d.nombre || 'BCV Oficial' };
+  } catch {
+    try {
+      const r2 = await fetch('https://ve.dolarapi.com/v1/dolares', { signal: AbortSignal.timeout(10000) });
+      const arr = await r2.json();
+      const of = arr.find(x => (x.nombre || '').toLowerCase().includes('oficial'));
+      if (of) {
+        return {
+          rate: parseFloat(of.promedio || of.venta || of.compra) || null,
+          fecha: of.fechaActualizacion ? of.fechaActualizacion.split('T')[0] : '',
+          fuente: of.nombre || 'BCV Oficial',
+        };
+      }
+    } catch {}
+    return { rate: null, fecha: '', fuente: '' };
+  }
+}
+
+// Buscar tasa histórica por fecha en la API
+async function fetchTasaHistoricaAPI(fecha) {
+  try {
+    const r = await fetch('https://ve.dolarapi.com/v1/historicos/dolares/oficial', { signal: AbortSignal.timeout(12000) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const arr = await r.json();
+    // arr: [{fecha, promedio, compra, venta, fuente}, ...]
+    const encontrado = arr.find(x => x.fecha && x.fecha.startsWith(fecha));
+    if (encontrado) {
+      return {
+        rate: parseFloat(encontrado.promedio || encontrado.venta || encontrado.compra),
+        fecha: encontrado.fecha ? encontrado.fecha.split('T')[0] : fecha,
+        fuente: encontrado.fuente || 'BCV Oficial',
+      };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchAction(isModal) {
+  const statusEl = document.getElementById(isModal ? 'm-status' : 'cfg-status');
+  const inp = document.getElementById(isModal ? 'm-bcv' : 'inp-bcv');
+  const dtInp = document.getElementById(isModal ? 'm-dt' : 'inp-dt');
+  statusEl.style.display = 'block';
+  statusEl.style.cssText += 'background:rgba(41,184,176,.08);color:var(--teal);border:1px solid rgba(41,184,176,.2);';
+  statusEl.textContent = '⟳ Consultando ve.dolarapi.com...';
+  const { rate, fecha, fuente } = await fetchBCV();
+  if (rate) {
+    inp.value = rate.toFixed(2);
+    dtInp.value = fecha || new Date().toISOString().split('T')[0];
+    statusEl.textContent = `✓ ${fuente}: Bs. ${N(rate)} / USD · ${fecha || 'hoy'}`;
+    liveCalc();
+  } else {
+    statusEl.style.cssText += 'background:rgba(200,168,75,.08);color:var(--gold2);border:1px solid rgba(200,168,75,.2);';
+    statusEl.textContent = '⚠ No se pudo conectar. Ingresa la tasa manualmente.';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  GUARDAR TASA BCV → SHEETS
+// ═══════════════════════════════════════════════════════════
+async function saveBCV() {
+  const tasa = parseFloat(document.getElementById('inp-bcv').value) || 0;
+  const fecha = document.getElementById('inp-dt').value;
+  if (!tasa || !fecha) { showStatus('cfg-status', 'error', '⚠ Ingresa tasa y fecha.'); return; }
+  S.bcv = tasa; S.bcvDate = fecha; lsSave(); updateHdr(); liveCalc();
+  showStatus('cfg-status', 'loading', '⟳ Guardando en Sheets...');
+  setSyncState('loading', 'Guardando...');
+  try {
+    await apiPost('saveTasa', { fecha, tasa, fuente: 'BCV Oficial' });
+    showStatus('cfg-status', 'ok', `✓ Tasa Bs. ${N(tasa)} guardada para ${fecha}`);
+    setSyncState('ok');
+    // Actualizar caché local
+    const idx = S.tasasHistoricas.findIndex(t => t.fecha === fecha);
+    if (idx >= 0) S.tasasHistoricas[idx].tasa = tasa;
+    else S.tasasHistoricas.unshift({ fecha, tasa, fuente: 'BCV Oficial' });
+    S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+    lsSave();
+    poblarSelectorTasas();
+  } catch {
+    showStatus('cfg-status', 'warn', '⚠ Guardado local. Sin conexión con Sheets.');
+    setSyncState('err', 'Sin conexión');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  MODAL BCV
+// ═══════════════════════════════════════════════════════════
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+  if (id === 'modal-bcv') {
+    document.getElementById('m-bcv').value = S.bcv || '';
+    document.getElementById('m-dt').value = S.bcvDate || '';
+    document.getElementById('m-status').style.display = 'none';
+  }
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+async function saveModal() {
+  const r = parseFloat(document.getElementById('m-bcv').value) || 0;
+  const d = document.getElementById('m-dt').value;
+  if (r > 0) {
+    S.bcv = r; S.bcvDate = d; lsSave(); updateHdr(); liveCalc();
+    closeModal('modal-bcv');
+    try { await apiPost('saveTasa', { fecha: d, tasa: r, fuente: 'BCV Oficial' }); } catch {}
+  }
+}
+document.querySelectorAll('.overlay').forEach(el =>
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); })
+);
+
+// ═══════════════════════════════════════════════════════════
+//  LIVE CALC
+// ═══════════════════════════════════════════════════════════
+function liveCalc() {
+  const bcv = parseFloat(document.getElementById('inp-bcv').value) || 0;
+  const sal = parseFloat(document.getElementById('inp-sal').value) || 0;
+  const b2 = parseFloat(document.getElementById('inp-b2').value) || 0;
+  const cu = parseFloat(document.getElementById('inp-cu').value) || 0;
+  const cbs = cu * bcv, ay = cbs * .65;
+  setEl('c-q1', fBs(sal / 2)); setEl('c-q1u', fUSD(usdFromBs(sal / 2, bcv)));
+  setEl('c-q2', fBs(sal / 2)); setEl('c-q2u', fUSD(usdFromBs(sal / 2, bcv)));
+  setEl('c-b2a', fBs(b2 / 2)); setEl('c-b2au', fUSD(usdFromBs(b2 / 2, bcv)));
+  setEl('c-b2b', fBs(b2 / 2)); setEl('c-b2bu', fUSD(usdFromBs(b2 / 2, bcv)));
+  setEl('c-cbs', fBs(cbs)); setEl('c-cusd', `${N(cu)} USD`);
+  setEl('c-ay', fBs(ay)); setEl('c-ayu', fUSD(usdFromBs(ay, bcv)));
+  // Actualizar info tasa en gasto
+  if (bcv > 0) setEl('g-tasa-info', `Tasa activa: Bs. ${N(bcv)} / USD · ${S.bcvDate || 'sin fecha'}`);
+  syncFijo();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  CALCULAR TODO + GUARDAR SNAPSHOT SALARIO
+// ═══════════════════════════════════════════════════════════
+async function calcularTodo() {
+  S.bcv = parseFloat(document.getElementById('inp-bcv').value) || S.bcv;
+  S.bcvDate = document.getElementById('inp-dt').value || S.bcvDate;
+  S.salario = parseFloat(document.getElementById('inp-sal').value) || 0;
+  S.b1 = parseFloat(document.getElementById('inp-b1').value) || 0;
+  S.b2 = parseFloat(document.getElementById('inp-b2').value) || 0;
+  S.cusd = parseFloat(document.getElementById('inp-cu').value) || 0;
+  const notas = document.getElementById('inp-notas').value.trim();
+  lsSave(); updateHdr();
+
+  const bcv = S.bcv, sal = S.salario, b1 = S.b1, b2 = S.b2, cu = S.cusd;
+  const cbs = cu * bcv, ay = cbs * .65;
+  const totalBs = sal + b1 + b2 + cbs + ay;
+  const totalUSD = usdFromBs(totalBs, bcv);
+
+  showStatus('cfg-status', 'loading', '⟳ Guardando en Google Sheets...');
+  setSyncState('loading', 'Guardando...');
+  try {
+    await apiPost('saveSalario', {
+      fecha: S.bcvDate || new Date().toISOString().split('T')[0],
+      tasa_dia: bcv,
+      salario_bs: sal, salario_usd: usdFromBs(sal, bcv),
+      bono1_bs: b1, bono1_usd: usdFromBs(b1, bcv),
+      bono2_bs: b2, bono2_usd: usdFromBs(b2, bcv),
+      cesta_usd: cu, cesta_bs: cbs,
+      ayuda_bs: ay, ayuda_usd: usdFromBs(ay, bcv),
+      total_bs: totalBs, total_usd: totalUSD,
+      notas,
+    });
+    await apiPost('saveTasa', { fecha: S.bcvDate, tasa: bcv, fuente: 'BCV Oficial' });
+    showStatus('cfg-status', 'ok', `✓ Guardado en Sheets · Total: ${fUSD(totalUSD)} / ${fBs(totalBs)}`);
+    setSyncState('ok');
+  } catch {
+    showStatus('cfg-status', 'warn', '⚠ Guardado local solamente. Sin conexión.');
+    setSyncState('err', 'Sin conexión');
+  }
+
+  renderResumen(); renderSemanal(); renderAhorro(); renderGastos();
+  nav(document.querySelectorAll('.nav-btn')[1], 'resumen');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SELECTOR TASAS HISTÓRICAS (para resumen)
+// ═══════════════════════════════════════════════════════════
+function poblarSelectorTasas() {
+  const sel = document.getElementById('sel-tasa-hist');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Tasa activa (hoy) — Bs. ' + N(S.bcv) + '</option>';
+  S.tasasHistoricas.forEach(t => {
+    const opt = document.createElement('option');
+    opt.value = t.fecha;
+    opt.textContent = `${t.fecha} — Bs. ${N(t.tasa)} / USD`;
+    sel.appendChild(opt);
+  });
+  if (current) sel.value = current;
+}
+
+function aplicarTasaHistorica() {
+  const sel = document.getElementById('sel-tasa-hist');
+  const fecha = sel.value;
+  if (!fecha) {
+    S.tasaVista = S.bcv;
+    setEl('sel-tasa-info', '');
+  } else {
+    const t = S.tasasHistoricas.find(x => x.fecha === fecha);
+    if (t) {
+      S.tasaVista = parseFloat(t.tasa);
+      setEl('sel-tasa-info', `Bs. ${N(t.tasa)} / USD · ${fecha}`);
+    }
+  }
+  renderResumen();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  RESUMEN
+// ═══════════════════════════════════════════════════════════
+function renderResumen() {
+  const tasa = S.tasaVista > 0 ? S.tasaVista : S.bcv;
+  const { salario: sal, b1, b2, cusd: cu } = S;
+  const cbs = cu * S.bcv, ay = cbs * .65; // Bs. siempre en tasa activa
+  // USD: usamos la tasa seleccionada para mostrar equivalencia
+  const toUSD = bs => usdFromBs(bs, tasa);
+  const total = sal + b1 + b2 + cbs + ay;
+
+  const kpis = [
+    { lbl: 'Bono 1', usd: toUSD(b1), bs: b1, ac: 'var(--gold)' },
+    { lbl: 'Bono 2', usd: toUSD(b2), bs: b2, ac: 'var(--gold)' },
+    { lbl: 'Salario', usd: toUSD(sal), bs: sal, ac: 'var(--blue)' },
+    { lbl: 'Cesta Ticket', usd: toUSD(cbs), bs: cbs, ac: 'var(--teal)' },
+    { lbl: 'Ayuda 65%', usd: toUSD(ay), bs: ay, ac: 'var(--teal)' },
+    { lbl: 'TOTAL MENSUAL', usd: toUSD(total), bs: total, ac: 'var(--green)', big: true },
+  ];
+
+  document.getElementById('kpi-grid').innerHTML = kpis.map(k => `
+    <div class="kpi" style="--ac:${k.ac};${k.big ? 'grid-column:span 2;' : ''}">
+      <div class="kpi-lbl">${k.lbl}</div>
+      <div class="kpi-val" style="${k.big ? 'font-size:1.3rem;color:var(--green);' : 'color:var(--teal);'}">${fUSD(k.usd)}</div>
+      <div class="kpi-sub">${fBs(k.bs)}</div>
+    </div>`).join('');
+
+  const rows = [
+    ['Bono 1', toUSD(b1), b1, 'Semana 1 (días 1–6)'],
+    ['Salario 1ª quincena', toUSD(sal / 2), sal / 2, 'Día 10'],
+    ['Ayuda 65% Cesta', toUSD(ay), ay, 'Semana 2'],
+    ['Bono 2 — parte 1', toUSD(b2 / 2), b2 / 2, 'Semana 3'],
+    ['Cesta Ticket', toUSD(cbs), cbs, 'Semana 3'],
+    ['Salario 2ª quincena', toUSD(sal / 2), sal / 2, 'Día 25'],
+    ['Bono 2 — parte 2', toUSD(b2 / 2), b2 / 2, 'Últimos días mes'],
+  ];
+  document.getElementById('tbl-body').innerHTML = rows.map(r => `
+    <tr><td>${r[0]}</td>
+    <td class="right mono teal">${fUSD(r[1])}</td>
+    <td class="right mono gold xs">${fBs(r[2])}</td>
+    <td class="right xs muted">${r[3]}</td></tr>`).join('') + `
+    <tr class="tot">
+      <td>TOTAL MENSUAL</td>
+      <td class="right mono" style="font-size:.98rem;">${fUSD(toUSD(total))}</td>
+      <td class="right mono gold">${fBs(total)}</td>
+      <td></td>
+    </tr>`;
+
+  poblarSelectorTasas();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  SEMANAL
+// ═══════════════════════════════════════════════════════════
+function renderSemanal() {
+  const { bcv: tasa, salario: sal, b1, b2, cusd: cu } = S;
+  const cbs = cu * tasa, ay = cbs * .65;
+  const toUSD = bs => usdFromBs(bs, tasa);
+  const sems = [
+    { t: 'Semana 1', r: 'Días 1 – 6', c: '#c8a84b', ps: [{ n: 'Bono 1', v: b1, s: 'Pago mensual completo' }] },
+    { t: 'Semana 2', r: 'Días 7 – 14 · cobro día 10', c: '#4a8ff0', ps: [{ n: 'Salario — 1ª quincena', v: sal / 2, s: 'Día 10 del mes' }, { n: 'Ayuda 65% Cesta', v: ay, s: '65% del valor Cesta en Bs.' }] },
+    { t: 'Semana 3', r: 'Días 15 – 21', c: '#29b8b0', ps: [{ n: 'Bono 2 — parte 1', v: b2 / 2, s: 'Primera mitad' }, { n: 'Cesta Ticket', v: cbs, s: `${N(cu)} USD a tasa BCV` }] },
+    { t: 'Semana 4', r: 'Días 22 – 31 · cobro día 25', c: '#44c97e', ps: [{ n: 'Salario — 2ª quincena', v: sal / 2, s: 'Día 25 del mes' }, { n: 'Bono 2 — parte 2', v: b2 / 2, s: 'Segunda mitad' }] },
+  ];
+  document.getElementById('week-blocks').innerHTML = sems.map(s => {
+    const tot = s.ps.reduce((a, p) => a + p.v, 0);
+    return `<div class="week-card" style="--ac:${s.c}">
+      <div class="week-head">
+        <div><div class="week-name" style="color:${s.c}">${s.t}</div><div class="week-range">${s.r}</div></div>
+        <div><div class="wt-bs" style="color:var(--teal);">${fUSD(toUSD(tot))}</div><div class="wt-usd" style="color:var(--gold2);">${fBs(tot)}</div></div>
+      </div>
+      ${s.ps.map(p => `<div class="pay-row">
+        <div class="pay-name"><div class="pay-dot" style="background:${s.c}"></div><div><div>${p.n}</div><div class="pay-sub">${p.s}</div></div></div>
+        <div class="pay-amt"><div class="pay-bs" style="color:var(--teal);">${fUSD(toUSD(p.v))}</div><div class="pay-usd" style="color:var(--gold2);">${fBs(p.v)}</div></div>
+      </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  GASTOS VARIABLES
+// ═══════════════════════════════════════════════════════════
+const semDia = d => d <= 6 ? 1 : d <= 14 ? 2 : d <= 21 ? 3 : 4;
+const semLabels = { 1: 'Sem 1 (1–6)', 2: 'Sem 2 (7–14)', 3: 'Sem 3 (15–21)', 4: 'Sem 4 (22–31)' };
+let gCur = 'usd';
+
+function setCur(cur) {
+  gCur = cur;
+  document.getElementById('g-inp-usd-wrap').style.display = cur === 'usd' ? 'block' : 'none';
+  document.getElementById('g-inp-bs-wrap').style.display = cur === 'bs' ? 'block' : 'none';
+  document.getElementById('g-cur-usd').style.cssText = `flex:1;padding:.55rem;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;background:${cur === 'usd' ? 'var(--teal);color:#0b1120' : 'var(--navy3);color:var(--text2)'};transition:all .15s;`;
+  document.getElementById('g-cur-bs').style.cssText = `flex:1;padding:.55rem;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;background:${cur === 'bs' ? 'var(--gold);color:#0b1120' : 'var(--navy3);color:var(--text2)'};transition:all .15s;`;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  TASA DEL DÍA — auto lookup al cambiar fecha
+// ═══════════════════════════════════════════════════════════
+let gTasaDiaActual = 0; // tasa confirmada para el gasto en curso
+
+function setTasaBox(estado, tasa, fecha, msg) {
+  // estado: 'ok' | 'api' | 'manual' | 'loading' | 'error'
+  const box  = document.getElementById('g-tasa-box');
+  const lbl  = document.getElementById('g-tasa-lbl');
+  const val  = document.getElementById('g-tasa-val');
+  const manW = document.getElementById('g-tasa-manual-wrap');
+  const btn  = document.getElementById('g-btn-add');
+  box.style.display = 'block';
+
+  const estilos = {
+    ok:      'background:rgba(68,201,126,.08);border:1px solid rgba(68,201,126,.2);',
+    api:     'background:rgba(41,184,176,.08);border:1px solid rgba(41,184,176,.2);',
+    loading: 'background:rgba(200,168,75,.06);border:1px solid rgba(200,168,75,.2);',
+    manual:  'background:rgba(74,143,240,.08);border:1px solid rgba(74,143,240,.2);',
+    error:   'background:rgba(224,92,92,.06);border:1px solid rgba(224,92,92,.2);',
+  };
+  const colores = { ok:'var(--green)', api:'var(--teal)', loading:'var(--gold2)', manual:'var(--blue)', error:'var(--red)' };
+
+  box.style.cssText += estilos[estado] || estilos.ok;
+  lbl.style.color = colores[estado] || colores.ok;
+  lbl.textContent = msg || '';
+  val.style.color = colores[estado] || colores.ok;
+  val.textContent = tasa > 0 ? `Bs. ${N(tasa)} / USD · ${fecha || ''}` : '';
+  manW.style.display = estado === 'error' ? 'block' : 'none';
+  btn.disabled = (estado === 'loading' || estado === 'error');
+  gTasaDiaActual = tasa > 0 ? tasa : 0;
+  // Refrescar conversión con nueva tasa
+  syncCurrency(gCur === 'usd' ? 'usd' : 'bs');
+}
+
+async function onFechaGastoChange() {
+  const fecha = document.getElementById('g-f').value;
+  if (!fecha) return;
+  const hoy = new Date().toISOString().split('T')[0];
+
+  // Si es hoy → usar tasa activa directamente
+  if (fecha === hoy) {
+    if (S.bcv > 0) {
+      setTasaBox('ok', S.bcv, fecha, '✓ Tasa activa (hoy)');
+    } else {
+      setTasaBox('error', 0, fecha, '⚠ Sin tasa activa — ingrésala manualmente');
+    }
+    return;
+  }
+
+  // Buscar en caché histórico local
+  const local = S.tasasHistoricas.find(t => t.fecha === fecha);
+  if (local && parseFloat(local.tasa) > 0) {
+    setTasaBox('ok', parseFloat(local.tasa), fecha, '✓ Encontrada en historial');
+    return;
+  }
+
+  // Buscar en API histórica
+  setTasaBox('loading', 0, fecha, '⟳ Buscando tasa en API histórica...');
+  const resultado = await fetchTasaHistoricaAPI(fecha);
+  if (resultado && resultado.rate > 0) {
+    // Guardar automáticamente en historial local y Sheets
+    S.tasasHistoricas.unshift({ fecha: resultado.fecha, tasa: resultado.rate, fuente: resultado.fuente });
+    S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+    lsSave();
+    try { await apiPost('saveTasa', { fecha: resultado.fecha, tasa: resultado.rate, fuente: resultado.fuente }); } catch {}
+    poblarSelectorTasas();
+    setTasaBox('api', resultado.rate, resultado.fecha, '✓ Obtenida de API histórica');
+  } else {
+    setTasaBox('error', 0, fecha, `⚠ Sin tasa para ${fecha} — ingrésala manualmente:`);
+  }
+}
+
+function onTasaManualInput() {
+  const t = parseFloat(document.getElementById('g-tasa-manual').value) || 0;
+  if (t > 0) {
+    gTasaDiaActual = t;
+    document.getElementById('g-btn-add').disabled = false;
+    syncCurrency(gCur === 'usd' ? 'usd' : 'bs');
+  }
+}
+
+async function guardarTasaManualGasto() {
+  const fecha = document.getElementById('g-f').value;
+  const t = parseFloat(document.getElementById('g-tasa-manual').value) || 0;
+  if (!t || !fecha) return;
+  S.tasasHistoricas.unshift({ fecha, tasa: t, fuente: 'Manual' });
+  S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+  lsSave(); poblarSelectorTasas();
+  try { await apiPost('saveTasa', { fecha, tasa: t, fuente: 'Manual' }); } catch {}
+  setTasaBox('manual', t, fecha, '✓ Tasa manual guardada');
+}
+
+function syncCurrency(from) {
+  // Usa la tasa del día actualmente confirmada, no la tasa activa global
+  const tasa = gTasaDiaActual > 0 ? gTasaDiaActual : (S.bcv || 0);
+  if (from === 'usd') {
+    const usd = parseFloat(document.getElementById('g-m-usd').value) || 0;
+    setEl('g-conv-bs', tasa > 0 ? `≈ Bs. ${N(usd * tasa)} (tasa ${N(tasa)})` : '≈ — Bs.');
+  } else {
+    const bs = parseFloat(document.getElementById('g-m-bs').value) || 0;
+    setEl('g-conv-usd', tasa > 0 ? `≈ $ ${N(bs / tasa)}` : '≈ — USD');
+  }
+}
+
+// Obtener tasa del día (para lectura interna)
+function getTasaDia(fecha) {
+  if (!fecha) return S.bcv;
+  const t = S.tasasHistoricas.find(x => x.fecha === fecha);
+  if (t) return parseFloat(t.tasa) || S.bcv;
+  return S.bcv;
+}
+
+async function addGasto() {
+  const desc  = document.getElementById('g-desc').value.trim();
+  const cat   = document.getElementById('g-c').value;
+  const fecha = document.getElementById('g-f').value;
+  if (!desc || !fecha) { alert('Completa descripción y fecha.'); return; }
+
+  const tasaDia = gTasaDiaActual > 0 ? gTasaDiaActual : getTasaDia(fecha);
+  if (!tasaDia) { alert('No hay tasa disponible para esa fecha.'); return; }
+
+  let montoUSD = 0, montoBsDia = 0;
+  if (gCur === 'usd') {
+    montoUSD   = parseFloat(document.getElementById('g-m-usd').value) || 0;
+    montoBsDia = montoUSD * tasaDia;
+  } else {
+    const bs   = parseFloat(document.getElementById('g-m-bs').value) || 0;
+    montoUSD   = usdFromBs(bs, tasaDia);
+    montoBsDia = bs;
+  }
+  if (!montoUSD) { alert('Ingresa un monto válido.'); return; }
+
+  const gasto = {
+    id: 'gto_' + Date.now(), fecha, descripcion: desc, categoria: cat,
+    monto_usd: montoUSD, tasa_dia: tasaDia, monto_bs_dia: montoBsDia, tipo: 'variable',
+  };
+
+  S.gastos.push(gasto); lsSave();
+  // Limpiar form
+  document.getElementById('g-desc').value = '';
+  document.getElementById('g-m-usd').value = '';
+  document.getElementById('g-m-bs').value = '';
+  document.getElementById('g-conv-bs').textContent = '≈ — Bs. (tasa del día)';
+  document.getElementById('g-conv-usd').textContent = '≈ — USD';
+  renderGastos(); renderAhorro();
+
+  setSyncState('loading', 'Guardando...');
+  showGastoSyncStatus('loading', '⟳ Guardando en Sheets...');
+  try {
+    const res = await apiPost('saveGasto', {
+      fecha, descripcion: desc, categoria: cat,
+      monto_usd: montoUSD, tasa_dia: tasaDia, monto_bs_dia: montoBsDia, tipo: 'variable',
+    });
+    // Mostrar respuesta exacta de Sheets para debug
+    if (res && res.status === 'ok' && res.data && res.data.id) {
+      const idxLocal = S.gastos.findIndex(g => g.id === gasto.id);
+      if (idxLocal >= 0) S.gastos[idxLocal].id = res.data.id;
+      lsSave();
+      setSyncState('ok');
+      showGastoSyncStatus('ok', `✓ Guardado en Sheets · ID: ${res.data.id}`);
+    } else {
+      // Respuesta inesperada — mostrarla completa
+      const detalle = JSON.stringify(res || {});
+      setSyncState('err', 'Respuesta inesperada');
+      showGastoSyncStatus('error', `⚠ Respuesta Sheets: ${detalle}`);
+    }
+  } catch(err) {
+    setSyncState('err', 'Error de conexión');
+    showGastoSyncStatus('error', `❌ Error: ${err.message || String(err)}`);
+  }
+}
+
+function showGastoSyncStatus(type, msg) {
+  let el = document.getElementById('g-sync-status');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'g-sync-status';
+    el.style.cssText = 'margin-top:.6rem;font-size:.75rem;padding:.55rem .8rem;border-radius:7px;font-family:IBM Plex Mono,monospace;word-break:break-all;';
+    const btn = document.getElementById('g-btn-add');
+    if (btn && btn.parentNode) btn.parentNode.insertBefore(el, btn.nextSibling);
+  }
+  const styles = {
+    ok:      'background:rgba(68,201,126,.1);border:1px solid rgba(68,201,126,.25);color:#44c97e;',
+    loading: 'background:rgba(41,184,176,.1);border:1px solid rgba(41,184,176,.25);color:#29b8b0;',
+    error:   'background:rgba(224,92,92,.1);border:1px solid rgba(224,92,92,.25);color:#e05c5c;',
+  };
+  el.style.cssText += styles[type] || styles.loading;
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+async function delGasto(id) {
+  if (!confirm('¿Borrar este gasto?')) return;
+  // Borrar local primero
+  S.gastos = S.gastos.filter(g => g.id !== id); lsSave();
+  renderGastos(); renderAhorro();
+  // Borrar en Sheets
+  setSyncState('loading', 'Borrando...');
+  try {
+    const res = await apiPost('deleteGasto', { id });
+    if (res && res.status === 'ok') {
+      setSyncState('ok');
+    } else {
+      // Sheets no encontró el ID — puede que el gasto ya no exista allá
+      setSyncState('ok'); // igual está borrado local
+    }
+  } catch(err) {
+    setSyncState('err', 'Sin conexión — borrado solo localmente');
+  }
+}
+
+async function clearG() {
+  const mesFiltro = document.getElementById('g-mes-filtro').value || '';
+  const label = mesFiltro ? `del mes ${mesFiltro}` : 'de todos los meses';
+  if (!confirm(`¿Borrar TODOS los gastos ${label}? Esto también los borrará de Google Sheets.`)) return;
+
+  // Qué gastos vamos a borrar
+  const aBorrar = mesFiltro
+    ? S.gastos.filter(g => String(g.fecha || '').startsWith(mesFiltro))
+    : [...S.gastos];
+  const idsABorrar = new Set(aBorrar.map(g => g.id));
+
+  // Borrar local
+  S.gastos = S.gastos.filter(g => !idsABorrar.has(g.id));
+  lsSave(); renderGastos(); renderAhorro();
+
+  // Borrar en Sheets — uno por uno
+  setSyncState('loading', 'Borrando en Sheets...');
+  let errores = 0;
+  for (const g of aBorrar) {
+    try { await apiPost('deleteGasto', { id: g.id }); }
+    catch { errores++; }
+  }
+  setSyncState(errores === 0 ? 'ok' : 'err',
+    errores > 0 ? `${errores} gastos no se borraron de Sheets` : undefined);
+}
+
+async function cargarGastosMes() {
+  // Los gastos ya están todos en memoria desde el init.
+  // El selector solo filtra la vista — renderGastos() lee el valor del input.
+  renderGastos(); renderAhorro();
+}
+
+function renderGastos() {
+  // Filtrar por el mes seleccionado en el selector — todos los datos están en memoria
+  const mesFiltro = (document.getElementById('g-mes-filtro') || {}).value || '';
+  const gastosDelMes = mesFiltro
+    ? S.gastos.filter(g => String(g.fecha || '').startsWith(mesFiltro))
+    : S.gastos;
+  const sorted = [...gastosDelMes].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+  const empty = document.getElementById('g-empty'), list = document.getElementById('g-list');
+  if (!sorted.length) { empty.style.display = 'block'; list.innerHTML = ''; }
+  else {
+    empty.style.display = 'none';
+    list.innerHTML = sorted.map(g => {
+      // USD: INMUTABLE — exactamente como fue cargado
+      const usd    = parseFloat(g.monto_usd) || 0;
+      const bsDia  = parseFloat(g.monto_bs_dia) || (usd * (parseFloat(g.tasa_dia) || S.bcv));
+      const tasaDia = parseFloat(g.tasa_dia) || S.bcv;
+      return `<div style="display:flex;align-items:center;gap:.7rem;background:var(--navy3);border-radius:8px;padding:.65rem .9rem;margin-bottom:.4rem;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            ${g.descripcion || g.desc || ''}
+          </div>
+          <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin-top:.25rem;">
+            <span class="xs muted">${g.fecha}</span>
+            <span class="bdg bdg-t">${g.categoria || g.cat || ''}</span>
+            <span style="font-size:.65rem;color:var(--text2);font-family:'IBM Plex Mono',monospace;opacity:.6;">
+              tasa Bs.${N(tasaDia)}
+            </span>
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <!-- USD: valor principal, prominente -->
+          <div class="mono teal" style="font-size:1rem;font-weight:600;">${fUSD(usd)}</div>
+          <!-- Bs: referencia discreta, poco impacto visual -->
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:.68rem;color:var(--text2);opacity:.55;margin-top:.1rem;">
+            Bs.${N(bsDia)}
+          </div>
+        </div>
+        <button class="btn btn-d btn-sm" onclick="delGasto('${g.id}')">✕</button>
+      </div>`;
+    }).join('');
+  }
+
+  // Resumen semanal — USD como valor, Bs solo en tooltip implícito
+  const sems = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  // Bs por semana sumando monto_bs_dia real (no recalculado)
+  const semsBs = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  gastosDelMes.forEach(g => {
+    const d = new Date((g.fecha || '') + 'T00:00:00').getDate();
+    const s = semDia(d);
+    sems[s]   += parseFloat(g.monto_usd)    || 0;
+    semsBs[s] += parseFloat(g.monto_bs_dia) || 0;
+  });
+  document.getElementById('g-sem').innerHTML = Object.entries(sems).map(([s, v]) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;background:var(--navy3);border-radius:7px;padding:.5rem .85rem;">
+      <span class="xs muted">${semLabels[s]}</span>
+      <div style="text-align:right;">
+        <div class="mono teal xs" style="font-weight:600;">${fUSD(v)}</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:.65rem;color:var(--text2);opacity:.5;">
+          ${semsBs[s] > 0 ? `Bs.${N(semsBs[s])}` : ''}
+        </div>
+      </div>
+    </div>`).join('');
+
+  const totUSD = gastosDelMes.reduce((a, g) => a + (parseFloat(g.monto_usd)    || 0), 0);
+  const totBs  = gastosDelMes.reduce((a, g) => a + (parseFloat(g.monto_bs_dia) || 0), 0);
+  setEl('g-tot-usd-main', fUSD(totUSD));
+  setEl('g-tot-bs-sub', fBs(totBs));
+}
+
+// ═══════════════════════════════════════════════════════════
+//  GASTOS FIJOS
+// ═══════════════════════════════════════════════════════════
+function syncFijo() {
+  const usd = parseFloat(document.getElementById('gf-monto')?.value) || 0;
+  const bcv = S.bcv || 0;
+  setEl('gf-conv', bcv > 0 ? `≈ Bs. ${N(usd * bcv)} a tasa activa` : '≈ — Bs. (sin tasa BCV)');
+}
+
+async function addGastoFijo() {
+  const desc = document.getElementById('gf-desc').value.trim();
+  const monto = parseFloat(document.getElementById('gf-monto').value) || 0;
+  const cat = document.getElementById('gf-cat').value;
+  if (!desc || !monto) { alert('Completa descripción y monto.'); return; }
+
+  const fijo = { id: 'fjo_' + Date.now(), descripcion: desc, categoria: cat, monto_usd: monto, activo: true };
+  S.gastosFijos.push(fijo); lsSave();
+  document.getElementById('gf-desc').value = '';
+  document.getElementById('gf-monto').value = '';
+  renderGastosFijos(); renderAhorro();
+
+  setSyncState('loading', 'Guardando...');
+  try {
+    const res = await apiPost('saveGastoFijo', { descripcion: desc, categoria: cat, monto_usd: monto });
+    // Confirmar ID real de Sheets
+    if (res && res.data && res.data.id) {
+      const idx = S.gastosFijos.findIndex(g => g.id === fijo.id);
+      if (idx >= 0) S.gastosFijos[idx].id = res.data.id;
+      lsSave();
+    }
+    setSyncState('ok');
+  } catch { setSyncState('err', 'Sin conexión'); }
+}
+
+async function delGastoFijo(id) {
+  if (!confirm('¿Borrar este gasto fijo?')) return;
+  S.gastosFijos = S.gastosFijos.filter(g => g.id !== id); lsSave();
+  renderGastosFijos(); renderAhorro();
+  setSyncState('loading', 'Borrando...');
+  try {
+    const res = await apiPost('deleteGastoFijo', { id });
+    if (res && res.status === 'ok') setSyncState('ok');
+    else setSyncState('ok');
+  } catch { setSyncState('err', 'Sin conexión — borrado solo localmente'); }
+}
+
+function renderGastosFijos() {
+  const fijos = S.gastosFijos.filter(g => g.activo !== false && g.activo !== 'FALSE');
+  const empty = document.getElementById('gf-empty'), list = document.getElementById('gf-list');
+  const bcv = S.bcv || 0;
+
+  if (!fijos.length) { empty.style.display = 'block'; list.innerHTML = ''; }
+  else {
+    empty.style.display = 'none';
+    list.innerHTML = fijos.map(g => {
+      const usd = parseFloat(g.monto_usd) || 0;
+      const bs = bsFromUSD(usd, bcv);
+      return `<div style="display:flex;align-items:center;gap:.7rem;background:var(--navy3);border-radius:8px;padding:.65rem .9rem;margin-bottom:.4rem;">
+        <span style="color:var(--gold2);font-size:1rem;">📌</span>
+        <div style="flex:1;">
+          <div style="font-size:.85rem;">${g.descripcion}</div>
+          <div class="xs muted"><span class="bdg bdg-gold">${g.categoria}</span> · mensual</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="mono teal" style="font-weight:500;">${fUSD(usd)}</div>
+          <div class="mono gold xs">Bs. ${N(bs)}</div>
+        </div>
+        <button class="btn btn-d btn-sm" onclick="delGastoFijo('${g.id}')">✕</button>
+      </div>`;
+    }).join('');
+  }
+
+  const totUSD = fijos.reduce((a, g) => a + (parseFloat(g.monto_usd) || 0), 0);
+  setEl('gf-total-usd', fUSD(totUSD));
+  setEl('gf-total-bs', `Bs. ${N(bsFromUSD(totUSD, bcv))} a tasa activa`);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  AHORRO + GRÁFICAS (todo en USD)
+// ═══════════════════════════════════════════════════════════
+function renderAhorro() {
+  const { bcv, salario: sal, b1, b2, cusd: cu } = S;
+  const cbs = cu * bcv, ay = cbs * .65, totalBs = sal + b1 + b2 + cbs + ay;
+  const totalUSD = usdFromBs(totalBs, bcv);
+
+  const totGasUSD = S.gastos.reduce((a, g) => a + (parseFloat(g.monto_usd) || 0), 0);
+  const totGasBsDia = S.gastos.reduce((a, g) => a + (parseFloat(g.monto_bs_dia) || 0), 0);
+  const fijosFijos = S.gastosFijos.filter(g => g.activo !== false && g.activo !== 'FALSE');
+  const totFijosUSD = fijosFijos.reduce((a, g) => a + (parseFloat(g.monto_usd) || 0), 0);
+  const totalGastosUSD = totGasUSD + totFijosUSD;
+
+  const saldoUSD = totalUSD - totalGastosUSD;
+  const saldoBs = totalBs - (totGasBsDia + bsFromUSD(totFijosUSD, bcv));
+  const metaUSD = totalUSD * .4, metaBs = totalBs * .4;
+  const pct = totalUSD > 0 ? Math.min((Math.max(saldoUSD, 0) / totalUSD) * 100, 100) : 0;
+
+  setEl('a-iusd', fUSD(totalUSD)); setEl('a-ibs', fBs(totalBs));
+  setEl('a-gusd', fUSD(totalGastosUSD)); setEl('a-gbs', fBs(totGasBsDia + bsFromUSD(totFijosUSD, bcv)));
+  setEl('a-susd', fUSD(saldoUSD)); setEl('a-sbs', fBs(saldoBs));
+  setEl('a-meta-usd', fUSD(metaUSD)); setEl('a-meta-bs', fBs(metaBs));
+  setEl('a-act-usd', fUSD(Math.max(saldoUSD, 0))); setEl('a-act-bs', fBs(Math.max(saldoBs, 0)));
+  document.getElementById('a-bar').style.width = pct + '%';
+  setEl('a-pct', pct.toFixed(1) + '%');
+
+  const pctG = totalUSD > 0 ? (totalGastosUSD / totalUSD) * 100 : 0;
+  let adv;
+  if (!totalUSD) adv = 'Configura tus ingresos para ver el análisis.';
+  else if (pct >= 40) adv = `✅ Excelente — ahorras ${pct.toFixed(1)}%. Saldo: ${fUSD(Math.max(saldoUSD, 0))}`;
+  else if (pct >= 20) adv = `⚠ Ahorras ${pct.toFixed(1)}%. Para llegar al 40% reduce gastos en ${fUSD(metaUSD - Math.max(saldoUSD, 0))}.`;
+  else adv = `🔴 Ahorro ${pct.toFixed(1)}%. Gastos = ${pctG.toFixed(1)}% del ingreso. Meta 40% = ${fUSD(metaUSD)}.`;
+  if (totFijosUSD > 0) adv += ` · Gastos fijos: ${fUSD(totFijosUSD)}/mes`;
+  setEl('a-adv', adv);
+
+  // Chart data — USD INMUTABLE desde monto_usd guardado, nunca recalculado
+  const catMap = {};
+  S.gastos.forEach(g => {
+    const c = g.categoria || g.cat || 'Otro';
+    catMap[c] = (catMap[c] || 0) + (parseFloat(g.monto_usd) || 0);  // USD original
+  });
+  fijosFijos.forEach(g => {
+    const c = g.categoria || 'Fijos';
+    catMap[c] = (catMap[c] || 0) + (parseFloat(g.monto_usd) || 0);
+  });
+
+  // Semanas: acumular USD original + Bs del día (monto_bs_dia, no recalculado)
+  const semsUSD = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  const semsBsOrig = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  S.gastos.forEach(g => {
+    const d = new Date((g.fecha || '') + 'T00:00:00').getDate();
+    const s = semDia(d);
+    semsUSD[s]    += parseFloat(g.monto_usd)    || 0;
+    semsBsOrig[s] += parseFloat(g.monto_bs_dia) || 0;
+  });
+
+  const pal = ['#29b8b0','#c8a84b','#4a8ff0','#44c97e','#e05c5c','#a78bfa','#fb923c','#f472b6','#94a3b8'];
+  const gc = 'rgba(255,255,255,.04)', tc = '#8fa0be';
+
+  // 1. Doughnut categorías — USD inmutable, Bs referencia en tooltip
+  if (CH.cat) CH.cat.destroy();
+  if (Object.keys(catMap).length) {
+    CH.cat = new Chart(document.getElementById('ch-cat'), {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(catMap),
+        datasets: [{ data: Object.values(catMap), backgroundColor: pal, borderWidth: 0, hoverOffset: 6 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right', labels: { color: tc, font: { size: 11 }, boxWidth: 10, padding: 8 } },
+          tooltip: { callbacks: { label: ctx => {
+            // USD: valor principal y exacto
+            // Bs: referencia aproximada con tasa activa (solo orientativo)
+            const usd = ctx.raw;
+            const bsRef = bcv > 0 ? usd * bcv : 0;
+            return [
+              `${fUSD(usd)}`,
+              bsRef > 0 ? `ref. Bs.${N(bsRef)}` : '',
+            ].filter(Boolean);
+          }}}
+        }
+      }
+    });
+  }
+
+  // 2. Flujo mensual — USD en eje, Bs solo tooltip referencia
+  if (CH.flow) CH.flow.destroy();
+  const ingUSD = [b1, b2, sal, cbs, ay].map(v => usdFromBs(v, bcv));
+  CH.flow = new Chart(document.getElementById('ch-flow'), {
+    type: 'bar',
+    data: {
+      labels: ['Bono 1','Bono 2','Salario','Cesta','Ayuda','G.Variable','G.Fijos','Meta 40%'],
+      datasets: [{
+        data: [...ingUSD, -totGasUSD, -totFijosUSD, metaUSD],
+        backgroundColor: ['#29b8b066','#29b8b044','#4a8ff066','#c8a84b66','#c8a84b44','#e05c5c88','#e05c5c55','#44c97e88'],
+        borderRadius: 5, borderWidth: 0,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => {
+          const usd = Math.abs(ctx.raw);
+          const bsRef = bcv > 0 ? usd * bcv : 0;
+          return [fUSD(usd), bsRef > 0 ? `ref. Bs.${N(bsRef)}` : ''].filter(Boolean);
+        }}}
+      },
+      scales: {
+        x: { ticks: { color: tc, font: { size: 11 } }, grid: { color: gc } },
+        y: { ticks: { color: tc, callback: v => `$ ${N(Math.abs(v))}` }, grid: { color: gc } }
+      }
+    }
+  });
+
+  // 3. Semanal — barras USD (inmutables), línea Bs del día (no recalculada)
+  if (CH.week) CH.week.destroy();
+  CH.week = new Chart(document.getElementById('ch-week'), {
+    type: 'bar',
+    data: {
+      labels: ['Sem 1','Sem 2','Sem 3','Sem 4'],
+      datasets: [
+        {
+          label: 'USD (original)',
+          data: Object.values(semsUSD),
+          backgroundColor: '#e05c5c55', borderColor: '#e05c5c',
+          borderWidth: 1.5, borderRadius: 5, yAxisID: 'y',
+        },
+        {
+          // Bs del día real — línea muy discreta, solo referencia
+          label: 'Bs. (ref.)',
+          data: Object.values(semsBsOrig),
+          type: 'line',
+          borderColor: 'rgba(200,168,75,.35)',
+          backgroundColor: 'rgba(200,168,75,.03)',
+          borderWidth: 1, borderDash: [4, 4],
+          pointRadius: 2, pointBackgroundColor: 'rgba(200,168,75,.4)',
+          tension: .35, fill: false, yAxisID: 'y2',
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: {
+            color: tc, font: { size: 11 }, boxWidth: 10,
+            // Bs en leyenda también discreta
+            generateLabels: chart => chart.data.datasets.map((ds, i) => ({
+              text: ds.label,
+              fillStyle: i === 0 ? '#e05c5c' : 'rgba(200,168,75,.4)',
+              strokeStyle: i === 0 ? '#e05c5c' : 'rgba(200,168,75,.4)',
+              lineWidth: i === 0 ? 0 : 1,
+              fontColor: i === 0 ? tc : 'rgba(143,160,190,.45)',
+              hidden: false, index: i,
+            }))
+          }
+        },
+        tooltip: { callbacks: { label: ctx =>
+          ctx.datasetIndex === 0
+            ? `${fUSD(ctx.raw)}`           // USD: claro y exacto
+            : `ref. Bs.${N(ctx.raw)}`      // Bs: referencia, prefijo "ref."
+        }}
+      },
+      scales: {
+        y:  { position: 'left',  ticks: { color: '#e05c5c', callback: v => `$ ${N(v)}` }, grid: { color: gc } },
+        y2: { position: 'right', ticks: { color: 'rgba(200,168,75,.35)', callback: v => `Bs.${N(v)}`, font: { size: 10 } }, grid: { display: false } },
+        x:  { ticks: { color: tc }, grid: { color: gc } }
+      }
+    }
+  });
+
+  // 4. Composición ingresos
+  if (CH.ing) CH.ing.destroy();
+  const ingComp = [
+    { l: 'Bono 1', v: usdFromBs(b1, bcv) }, { l: 'Bono 2', v: usdFromBs(b2, bcv) },
+    { l: 'Salario', v: usdFromBs(sal, bcv) }, { l: 'Cesta', v: usdFromBs(cbs, bcv) }, { l: 'Ayuda', v: usdFromBs(ay, bcv) },
+  ].filter(x => x.v > 0);
+  if (ingComp.length) {
+    const tot = ingComp.reduce((a, x) => a + x.v, 0);
+    CH.ing = new Chart(document.getElementById('ch-ing'), {
+      type: 'doughnut',
+      data: { labels: ingComp.map(x => x.l), datasets: [{ data: ingComp.map(x => x.v), backgroundColor: ['#c8a84b', '#c8a84b88', '#4a8ff0', '#29b8b0', '#29b8b088'], borderWidth: 0, hoverOffset: 6 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'right', labels: { color: tc, font: { size: 11 }, boxWidth: 10, padding: 8 } },
+          tooltip: { callbacks: { label: ctx => [fUSD(ctx.raw) + ` (${((ctx.raw / tot) * 100).toFixed(1)}%)`, `Bs. ${N(ctx.raw * bcv)}`] } }
+        }
+      }
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  HISTÓRICO TASAS
+// ═══════════════════════════════════════════════════════════
+async function cargarTasasHistoricas() {
+  showLoading('Cargando historial de tasas...');
+  try {
+    const res = await apiGet('getTasas');
+    if (res.status === 'ok' && res.data) {
+      S.tasasHistoricas = res.data
+        .map(t => ({ fecha: String(t.fecha || ''), tasa: parseFloat(t.tasa) || 0, fuente: t.fuente || 'BCV' }))
+        .filter(t => t.fecha && t.tasa > 0)
+        .sort((a, b) => b.fecha.localeCompare(a.fecha));
+      lsSave(); setSyncState('ok');
+      poblarSelectorTasas();
+    }
+  } catch { setSyncState('err', 'Sin conexión'); }
+  renderTasasList();
+  hideLoading();
+}
+
+function renderTasasList() {
+  const cont = document.getElementById('ht-list');
+  setEl('ht-activa', S.bcv > 0 ? `Bs. ${N(S.bcv)}` : '—');
+  setEl('ht-activa-fecha', S.bcvDate || '—');
+
+  if (!S.tasasHistoricas.length) {
+    cont.innerHTML = '<div class="muted small" style="text-align:center;padding:1.5rem;">Sin tasas registradas. Guarda tu primera tasa desde Configuración.</div>';
+    return;
+  }
+  cont.innerHTML = S.tasasHistoricas.map(t => {
+    const isActive = t.fecha === S.bcvDate;
+    return `<div class="tasa-row ${isActive ? 'active-tasa' : ''}">
+      <div>
+        <div class="mono" style="font-size:.9rem;color:${isActive ? 'var(--gold2)' : 'var(--text)'};">Bs. ${N(t.tasa)} / USD</div>
+        <div class="xs muted">${t.fecha} · ${t.fuente || 'BCV'} ${isActive ? '· <span style="color:var(--gold2);">ACTIVA</span>' : ''}</div>
+      </div>
+      <div style="display:flex;gap:.5rem;">
+        <button class="btn btn-t btn-sm" onclick="usarTasaHistorica('${t.fecha}',${t.tasa})">Usar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function usarTasaHistorica(fecha, tasa) {
+  S.tasaVista = tasa;
+  // Navegar a resumen con esa tasa
+  const sel = document.getElementById('sel-tasa-hist');
+  if (sel) { sel.value = fecha; setEl('sel-tasa-info', `Bs. ${N(tasa)} / USD · ${fecha}`); }
+  nav(document.querySelector('.nav-btn:nth-child(2)'), 'resumen');
+  renderResumen();
+}
+
+async function buscarTasaHistorica() {
+  const fecha = document.getElementById('ht-fecha').value;
+  if (!fecha) { alert('Selecciona una fecha.'); return; }
+  showStatus('ht-status', 'loading', '⟳ Buscando en API histórica...');
+
+  // Primero buscar en caché local
+  const local = S.tasasHistoricas.find(t => t.fecha === fecha);
+  if (local) {
+    showStatus('ht-status', 'ok', `✓ Encontrada en historial local: Bs. ${N(local.tasa)} / USD`);
+    return;
+  }
+
+  // Buscar en API histórica de dolarapi.com
+  const resultado = await fetchTasaHistoricaAPI(fecha);
+  if (resultado) {
+    showStatus('ht-status', 'ok', `✓ Encontrada en API: Bs. ${N(resultado.rate)} / USD · ${resultado.fecha}`);
+    // Guardar en Sheets automáticamente
+    try {
+      await apiPost('saveTasa', { fecha: resultado.fecha, tasa: resultado.rate, fuente: resultado.fuente });
+      S.tasasHistoricas.unshift({ fecha: resultado.fecha, tasa: resultado.rate, fuente: resultado.fuente });
+      S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+      lsSave(); renderTasasList(); poblarSelectorTasas();
+      showStatus('ht-status', 'ok', `✓ Tasa ${resultado.fecha}: Bs. ${N(resultado.rate)} guardada automáticamente.`);
+    } catch { showStatus('ht-status', 'warn', `⚠ Tasa encontrada (${N(resultado.rate)}) pero no se pudo guardar en Sheets.`); }
+  } else {
+    showStatus('ht-status', 'error', `⚠ No se encontró tasa para ${fecha} en la API. Intenta otra fecha o ingrésala manualmente.`);
+  }
+}
+
+async function guardarTasaManual() {
+  const fecha = document.getElementById('ht-fecha').value;
+  const statusEl = document.getElementById('ht-status');
+  statusEl.style.display = 'block';
+  const tasa = prompt(`Ingresa la tasa BCV manualmente para ${fecha || 'la fecha seleccionada'} (Bs. por USD):`);
+  if (!tasa || isNaN(parseFloat(tasa))) return;
+  const t = parseFloat(tasa);
+  showStatus('ht-status', 'loading', '⟳ Guardando...');
+  try {
+    await apiPost('saveTasa', { fecha, tasa: t, fuente: 'Manual' });
+    S.tasasHistoricas.unshift({ fecha, tasa: t, fuente: 'Manual' });
+    S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+    lsSave(); renderTasasList(); poblarSelectorTasas();
+    showStatus('ht-status', 'ok', `✓ Tasa manual Bs. ${N(t)} para ${fecha} guardada.`);
+  } catch { showStatus('ht-status', 'error', '⚠ Error guardando en Sheets.'); }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  HISTÓRICO SALARIOS
+// ═══════════════════════════════════════════════════════════
+async function cargarHistorialSalarios() {
+  showLoading('Cargando historial de salarios...');
+  try {
+    const res = await apiGet('getSalarios');
+    if (res.status === 'ok' && res.data) {
+      S.salarios = res.data.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+      lsSave(); setSyncState('ok');
+    }
+  } catch { setSyncState('err', 'Sin conexión'); }
+  renderHistorialSalarios();
+  hideLoading();
+}
+
+function renderHistorialSalarios() {
+  if (!S.salarios.length) {
+    document.getElementById('hs-list').innerHTML = '<div class="muted small" style="text-align:center;padding:1.5rem;">Sin historial. Guarda tu configuración para registrar el primer snapshot.</div>';
+    return;
+  }
+
+  const ultimo = S.salarios[0];
+  setEl('hs-sal-usd', fUSD(parseFloat(ultimo.salario_usd) || 0));
+  setEl('hs-sal-bs', fBs(parseFloat(ultimo.salario_bs) || 0));
+  setEl('hs-tasa', `Bs. ${N(parseFloat(ultimo.tasa_dia) || 0)}`);
+  setEl('hs-tasa-fecha', ultimo.fecha || '—');
+  setEl('hs-total-usd', fUSD(parseFloat(ultimo.total_usd) || 0));
+  setEl('hs-total-bs', fBs(parseFloat(ultimo.total_bs) || 0));
+
+  document.getElementById('hs-list').innerHTML = S.salarios.map((s, i) => {
+    const isLatest = i === 0;
+    const salUSD = parseFloat(s.salario_usd) || 0;
+    const salBs = parseFloat(s.salario_bs) || 0;
+    const totUSD = parseFloat(s.total_usd) || 0;
+    const tasaDia = parseFloat(s.tasa_dia) || 0;
+    const prev = S.salarios[i + 1];
+    const diff = prev ? salUSD - (parseFloat(prev.salario_usd) || 0) : null;
+
+    return `<div class="sal-card ${isLatest ? 'latest' : ''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.6rem;">
+        <div>
+          <div style="font-size:.85rem;font-weight:600;color:${isLatest ? 'var(--green)' : 'var(--text)'};">${s.fecha || '—'} ${isLatest ? '<span class="bdg bdg-g">ACTUAL</span>' : ''}</div>
+          <div class="xs muted">Tasa del día: Bs. ${N(tasaDia)} / USD</div>
+          ${s.notas ? `<div class="xs" style="color:var(--text2);margin-top:.2rem;font-style:italic;">"${s.notas}"</div>` : ''}
+        </div>
+        <div style="text-align:right;">
+          ${diff !== null ? `<div class="xs ${diff >= 0 ? 'green' : 'red'}">${diff >= 0 ? '▲' : '▼'} ${fUSD(Math.abs(diff))}</div>` : ''}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;">
+        <div><div class="xs muted">Salario</div><div class="mono teal xs">${fUSD(salUSD)}</div><div class="mono gold xs">${fBs(salBs)}</div></div>
+        <div><div class="xs muted">Bonos</div><div class="mono teal xs">${fUSD((parseFloat(s.bono1_usd) || 0) + (parseFloat(s.bono2_usd) || 0))}</div></div>
+        <div><div class="xs muted">Total c/beneficios</div><div class="mono teal xs">${fUSD(totUSD)}</div><div class="mono gold xs">${fBs(parseFloat(s.total_bs) || 0)}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Gráfica evolución
+  renderGraficaSalarios();
+}
+
+function renderGraficaSalarios() {
+  if (CH.sal) CH.sal.destroy();
+  if (!S.salarios.length) return;
+  const sorted = [...S.salarios].reverse();
+  const tc = '#8fa0be', gc = 'rgba(255,255,255,.04)';
+  CH.sal = new Chart(document.getElementById('ch-sal'), {
+    type: 'line',
+    data: {
+      labels: sorted.map(s => s.fecha || ''),
+      datasets: [
+        { label: 'Salario USD', data: sorted.map(s => parseFloat(s.salario_usd) || 0), borderColor: '#4a8ff0', backgroundColor: 'rgba(74,143,240,.08)', borderWidth: 2, pointBackgroundColor: '#4a8ff0', tension: .35, fill: true },
+        { label: 'Total USD', data: sorted.map(s => parseFloat(s.total_usd) || 0), borderColor: '#44c97e', backgroundColor: 'rgba(68,201,126,.05)', borderWidth: 2, pointBackgroundColor: '#44c97e', tension: .35, fill: false },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { labels: { color: tc, font: { size: 11 }, boxWidth: 10 } },
+        tooltip: { callbacks: { label: ctx => [fUSD(ctx.raw), `Bs. ${N(ctx.raw * (sorted[ctx.dataIndex]?.tasa_dia || S.bcv))}`] } }
+      },
+      scales: {
+        x: { ticks: { color: tc, maxRotation: 45 }, grid: { color: gc } },
+        y: { ticks: { color: tc, callback: v => `$ ${N(v)}` }, grid: { color: gc } }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+//  NAV
+// ═══════════════════════════════════════════════════════════
+function nav(btn, pid) {
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('page-' + pid).classList.add('active');
+  // Lazy render on nav
+  if (pid === 'htasas') renderTasasList();
+  if (pid === 'hsalarios') renderHistorialSalarios();
+  if (pid === 'fijos') renderGastosFijos();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  HELPERS UI
+// ═══════════════════════════════════════════════════════════
+function showStatus(id, type, msg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const styles = {
+    ok: 'background:rgba(68,201,126,.08);color:var(--green);border:1px solid rgba(68,201,126,.2);',
+    loading: 'background:rgba(41,184,176,.08);color:var(--teal);border:1px solid rgba(41,184,176,.2);',
+    warn: 'background:rgba(200,168,75,.08);color:var(--gold2);border:1px solid rgba(200,168,75,.2);',
+    error: 'background:rgba(224,92,92,.08);color:var(--red);border:1px solid rgba(224,92,92,.2);',
+  };
+  el.style.cssText = 'display:block;margin-top:.9rem;font-size:.8rem;padding:.7rem 1rem;border-radius:8px;' + (styles[type] || styles.ok);
+  el.textContent = msg;
+}
+function showLoading(msg) {
+  document.getElementById('loading-overlay').classList.add('open');
+  setEl('loading-msg', msg || 'Cargando...');
+}
+function hideLoading() { document.getElementById('loading-overlay').classList.remove('open'); }
+
+// ═══════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════
+window.onload = async () => {
+  lsLoad();
+  const hoy = new Date().toISOString().split('T')[0];
+  document.getElementById('g-f').value = hoy;
+  // Inicializar tasa del día para el formulario de gastos
+  gTasaDiaActual = S.bcv || 0;
+  if (S.bcv > 0) {
+    setTasaBox('ok', S.bcv, hoy, '✓ Tasa activa (hoy)');
+    document.getElementById('g-btn-add').disabled = false;
+  }
+  document.getElementById('inp-dt').value = hoy;
+  document.getElementById('m-dt').value = hoy;
+  document.getElementById('ht-fecha').value = hoy;
+  const mesActual = hoy.slice(0, 7);
+  document.getElementById('g-mes-filtro').value = mesActual;
+
+  if (S.bcv) { document.getElementById('inp-bcv').value = S.bcv; document.getElementById('inp-dt').value = S.bcvDate || hoy; }
+  if (S.salario) document.getElementById('inp-sal').value = S.salario;
+  if (S.b1) document.getElementById('inp-b1').value = S.b1;
+  if (S.b2) document.getElementById('inp-b2').value = S.b2;
+  if (S.cusd) document.getElementById('inp-cu').value = S.cusd;
+
+  updateHdr(); liveCalc(); setCur('usd');
+  S.tasaVista = S.bcv;
+
+  if (S.bcv && S.salario) { renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos(); }
+
+  // Sincronizar con Supabase en background
+  setSyncState('loading', 'Conectando...');
+  showLoading('Sincronizando con Supabase...');
+  try {
+    // Cargar tasas históricas
+    const resTasas = await apiGet('getTasas');
+    if (resTasas.status === 'ok' && resTasas.data) {
+      S.tasasHistoricas = resTasas.data
+        .map(t => ({ fecha: String(t.fecha || ''), tasa: parseFloat(t.tasa) || 0, fuente: t.fuente || 'BCV' }))
+        .filter(t => t.fecha && t.tasa > 0)
+        .sort((a, b) => b.fecha.localeCompare(a.fecha));
+    }
+
+    // Cargar gastos fijos
+    const resFijos = await apiGet('getGastosFijos');
+    if (resFijos.status === 'ok' && resFijos.data) {
+      S.gastosFijos = resFijos.data.map(g => ({ ...g, monto_usd: parseFloat(g.monto_usd) || 0, activo: g.activo === true || g.activo === 'TRUE' }));
+    }
+
+    // Cargar config guardada
+    const resCfg = await apiGet('getConfig');
+    if (resCfg.status === 'ok' && resCfg.data) {
+      const cfg = resCfg.data;
+      if (cfg.bcv && !S.bcv) { S.bcv = parseFloat(cfg.bcv); S.bcvDate = cfg.bcvDate || hoy; }
+    }
+
+    // Cargar gastos — sin filtro de mes en el init para sincronizar TODO desde Sheets
+    // El filtro por mes solo aplica al botón manual "Cargar mes"
+    const resGastos = await apiGet('getGastos');
+    if (resGastos.status === 'ok' && Array.isArray(resGastos.data)) {
+      const deSheets = resGastos.data.map(g => ({
+        ...g,
+        id: String(g.id || ''),
+        monto_usd:    parseFloat(g.monto_usd)    || 0,
+        tasa_dia:     parseFloat(g.tasa_dia)     || S.bcv,
+        monto_bs_dia: parseFloat(g.monto_bs_dia) || 0,
+      }));
+      // Gastos locales pendientes de sync que aún no están en Sheets
+      const idsSheets = new Set(deSheets.map(g => g.id));
+      const pendientes = S.gastos.filter(g =>
+        String(g.id || '').startsWith('gto_') && !idsSheets.has(String(g.id))
+      );
+      S.gastos = [...deSheets, ...pendientes];
+      // Mostrar el mes actual por defecto en el filtro visual
+      S.gastos_mes_visible = mesActual;
+    }
+
+    // Cargar historial de salarios
+    const resSal = await apiGet('getSalarios');
+    if (resSal.status === 'ok' && resSal.data) {
+      S.salarios = resSal.data.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+      // Restaurar último salario si no hay en local
+      if (!S.salario && S.salarios.length) {
+        const ult = S.salarios[0];
+        S.salario = parseFloat(ult.salario_bs) || 0;
+        S.b1 = parseFloat(ult.bono1_bs) || 0;
+        S.b2 = parseFloat(ult.bono2_bs) || 0;
+        S.cusd = parseFloat(ult.cesta_usd) || 0;
+        S.bcv = parseFloat(ult.tasa_dia) || S.bcv;
+        document.getElementById('inp-sal').value = S.salario;
+        document.getElementById('inp-b1').value = S.b1;
+        document.getElementById('inp-b2').value = S.b2;
+        document.getElementById('inp-cu').value = S.cusd;
+        document.getElementById('inp-bcv').value = S.bcv;
+      }
+    }
+
+    lsSave();
+    updateHdr(); liveCalc(); poblarSelectorTasas();
+    renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos();
+    setSyncState('ok');
+
+  } catch (err) {
+    setSyncState('err', 'Sin conexión');
+    // Si hay datos locales, usarlos
+    if (S.bcv && S.salario) { renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos(); }
+  }
+  hideLoading();
+
+  // Auto-fetch BCV si no hay tasa
+  if (!S.bcv) {
+    setTimeout(async () => {
+      const { rate, fecha, fuente } = await fetchBCV();
+      if (rate) {
+        S.bcv = rate; S.bcvDate = fecha || hoy; lsSave(); updateHdr();
+        document.getElementById('inp-bcv').value = rate.toFixed(2);
+        document.getElementById('inp-dt').value = S.bcvDate;
+        liveCalc();
+        showStatus('cfg-status', 'ok', `✓ Tasa ${fuente}: Bs. ${N(rate)} cargada automáticamente`);
+      }
+    }, 500);
+  }
+};
+</script>
+</body>
+</html>
