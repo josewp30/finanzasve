@@ -2,8 +2,20 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FinanzasVE">
+<meta name="theme-color" content="#0b1120">
 <title>FinanzasVE</title>
+
+<!-- PWA Manifest inline -->
+<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22FinanzasVE%22%2C%22short_name%22%3A%22FinanzasVE%22%2C%22description%22%3A%22Gestor%20de%20finanzas%20personales%20venezolano%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230b1120%22%2C%22theme_color%22%3A%22%230b1120%22%2C%22orientation%22%3A%22portrait%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%253D'http%253A%252F%252Fwww.w3.org%252F2000%252Fsvg'%2520viewBox%253D'0%25200%252096%252096'%253E%253Crect%2520width%253D'96'%2520height%253D'96'%2520rx%253D'18'%2520fill%253D'%25230b1120'%252F%253E%253Ctext%2520x%253D'48'%2520y%253D'62'%2520text-anchor%253D'middle'%2520font-size%253D'52'%253E%25F0%259F%2587%25BB%253C%252Ftext%253E%253C%252Fsvg%253E%22%2C%22sizes%22%3A%22any%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%2C%22purpose%22%3A%22any%20maskable%22%7D%5D%7D">
+
+<!-- Apple touch icon inline SVG → PNG via canvas -->
+<link rel="apple-touch-icon" id="apple-icon" href="">
+
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
@@ -194,6 +206,10 @@ input::placeholder{color:var(--text2);font-family:'IBM Plex Sans',sans-serif;}
 <div class="topbar">
   <div class="logo">FINANZAS<span>VE</span></div>
   <div class="topbar-right">
+      <!-- Botón instalar PWA — solo visible cuando el navegador lo permite -->
+      <button id="pwa-install-btn" onclick="installPWA()" style="display:none;align-items:center;gap:.4rem;padding:.35rem .8rem;border-radius:7px;border:1px solid rgba(200,168,75,.3);background:rgba(200,168,75,.1);color:var(--gold2);font-family:'IBM Plex Sans',sans-serif;font-size:.75rem;font-weight:600;cursor:pointer;">
+        ⬇ Instalar app
+      </button>
     <div class="sync-indicator" id="sync-indicator">
       <div class="sync-dot" id="sync-dot"></div>
       <span id="sync-lbl">Offline</span>
@@ -2089,6 +2105,94 @@ window.onload = async () => {
     }, 500);
   }
 };
+
+// ═══════════════════════════════════════════════════════════
+//  PWA — Service Worker + Install prompt
+// ═══════════════════════════════════════════════════════════
+(function initPWA() {
+  // Generar ícono PNG dinámico para Apple touch icon
+  function makeIcon() {
+    const c = document.createElement('canvas');
+    c.width = c.height = 192;
+    const ctx = c.getContext('2d');
+    // Fondo navy
+    ctx.fillStyle = '#0b1120';
+    const r = 36;
+    ctx.beginPath();
+    ctx.moveTo(r, 0); ctx.lineTo(192-r, 0);
+    ctx.quadraticCurveTo(192, 0, 192, r);
+    ctx.lineTo(192, 192-r); ctx.quadraticCurveTo(192, 192, 192-r, 192);
+    ctx.lineTo(r, 192); ctx.quadraticCurveTo(0, 192, 0, 192-r);
+    ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
+    ctx.closePath(); ctx.fill();
+    // Texto "₿VE" en gold
+    ctx.fillStyle = '#c8a84b';
+    ctx.font = 'bold 58px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('FVE', 96, 96);
+    return c.toDataURL('image/png');
+  }
+
+  // Poner ícono Apple
+  const appleIcon = document.getElementById('apple-icon');
+  if (appleIcon) appleIcon.href = makeIcon();
+
+  // Registrar Service Worker inline via Blob para funcionar desde file:// y GitHub Pages
+  const swCode = `
+    const CACHE = 'finanzasve-v1';
+    const PRECACHE = [];
+    self.addEventListener('install', e => { self.skipWaiting(); });
+    self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
+    self.addEventListener('fetch', e => {
+      // Solo cachear mismo origen, no Supabase ni APIs externas
+      if (!e.request.url.startsWith(self.location.origin)) return;
+      e.respondWith(
+        caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
+          const clone = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+          return res;
+        }))
+      );
+    });
+  `;
+  const blob = new Blob([swCode], { type: 'application/javascript' });
+  const swUrl = URL.createObjectURL(blob);
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register(swUrl, { scope: './' })
+      .then(() => console.log('[PWA] Service Worker registrado'))
+      .catch(e => console.log('[PWA] SW no disponible:', e.message));
+  }
+
+  // Banner de instalación para Android Chrome
+  let deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredPrompt = e;
+    // Mostrar botón de instalación en topbar
+    const btn = document.getElementById('pwa-install-btn');
+    if (btn) { btn.style.display = 'flex'; }
+  });
+
+  window.addEventListener('appinstalled', () => {
+    const btn = document.getElementById('pwa-install-btn');
+    if (btn) btn.style.display = 'none';
+    deferredPrompt = null;
+  });
+
+  window.installPWA = async () => {
+    if (!deferredPrompt) {
+      alert('Para instalar en iOS:\n1. Toca el botón Compartir (□↑)\n2. Selecciona "Añadir a pantalla de inicio"');
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    const btn = document.getElementById('pwa-install-btn');
+    if (btn) btn.style.display = 'none';
+  };
+})();
 </script>
 </body>
 </html>
