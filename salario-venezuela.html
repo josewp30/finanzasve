@@ -18,6 +18,7 @@
 
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{
   --navy:#0b1120;--navy2:#131d30;--navy3:#1a2540;
@@ -206,6 +207,12 @@ input::placeholder{color:var(--text2);font-family:'IBM Plex Sans',sans-serif;}
 <div class="topbar">
   <div class="logo">FINANZAS<span>VE</span></div>
   <div class="topbar-right">
+      <!-- Usuario logueado -->
+      <div id="user-info" style="display:none;align-items:center;gap:.5rem;font-size:.75rem;color:var(--text2);">
+        <div id="user-avatar" style="width:26px;height:26px;border-radius:50%;background:var(--gold);color:#0b1120;font-weight:700;font-size:.7rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;"></div>
+        <span id="user-email-lbl" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+        <button onclick="signOut()" style="padding:.25rem .55rem;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:.7rem;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;">Salir</button>
+      </div>
       <!-- Botón instalar PWA — solo visible cuando el navegador lo permite -->
       <button id="pwa-install-btn" onclick="installPWA()" style="display:none;align-items:center;gap:.4rem;padding:.35rem .8rem;border-radius:7px;border:1px solid rgba(200,168,75,.3);background:rgba(200,168,75,.1);color:var(--gold2);font-family:'IBM Plex Sans',sans-serif;font-size:.75rem;font-weight:600;cursor:pointer;">
         ⬇ Instalar app
@@ -223,6 +230,7 @@ input::placeholder{color:var(--text2);font-family:'IBM Plex Sans',sans-serif;}
   </div>
 </div>
 
+<div id="main-app" style="display:none;flex-direction:column;">
 <div class="layout">
   <nav class="sidebar">
     <div class="nav-sec">Principal</div>
@@ -643,6 +651,9 @@ input::placeholder{color:var(--text2);font-family:'IBM Plex Sans',sans-serif;}
   </main>
 </div>
 
+</div><!-- /layout -->
+</div><!-- /main-app -->
+
 <!-- ═══════════════════════════════════════════════
      MODAL: BCV
 ════════════════════════════════════════════════ -->
@@ -665,14 +676,204 @@ input::placeholder{color:var(--text2);font-family:'IBM Plex Sans',sans-serif;}
   </div>
 </div>
 
+<!-- ═══════════════════════════════════════════════
+     PANTALLA DE AUTENTICACIÓN
+════════════════════════════════════════════════ -->
+<div id="auth-screen" style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--navy);padding:1.5rem;">
+  <div style="width:100%;max-width:380px;">
+    <!-- Logo -->
+    <div style="text-align:center;margin-bottom:2rem;">
+      <div style="font-size:1.6rem;font-weight:600;color:#fff;letter-spacing:.06em;">FINANZAS<span style="color:var(--gold);">VE</span></div>
+      <div style="font-size:.82rem;color:var(--text2);margin-top:.4rem;">Gestor de finanzas personales venezolano</div>
+    </div>
+
+    <!-- Card auth -->
+    <div style="background:var(--navy2);border:1px solid var(--border);border-radius:14px;padding:1.8rem;">
+      <div id="auth-title" style="font-size:1rem;font-weight:600;color:#fff;margin-bottom:1.2rem;text-align:center;">Iniciar sesión</div>
+
+      <div id="auth-mode" data-mode="login">
+        <!-- Google -->
+        <button id="auth-btn-google" onclick="handleGoogleSignIn()" style="width:100%;display:flex;align-items:center;justify-content:center;gap:.6rem;padding:.7rem;border-radius:9px;border:1px solid var(--border);background:var(--navy3);color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:.85rem;font-weight:500;cursor:pointer;margin-bottom:1rem;transition:border-color .15s;">
+          <svg width="16" height="16" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Continuar con Google
+        </button>
+
+        <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:1rem;">
+          <div style="flex:1;height:1px;background:var(--border);"></div>
+          <span style="font-size:.72rem;color:var(--text2);">o con email</span>
+          <div style="flex:1;height:1px;background:var(--border);"></div>
+        </div>
+
+        <div style="margin-bottom:.7rem;">
+          <label style="font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);display:block;margin-bottom:.35rem;">Email</label>
+          <input type="email" id="auth-email" placeholder="tu@email.com"
+            style="width:100%;padding:.65rem .9rem;background:var(--navy3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:.88rem;"
+            onkeydown="if(event.key==='Enter')handleSignIn()">
+        </div>
+        <div style="margin-bottom:1rem;">
+          <label style="font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);display:block;margin-bottom:.35rem;">Contraseña</label>
+          <input type="password" id="auth-pass" placeholder="mínimo 6 caracteres"
+            style="width:100%;padding:.65rem .9rem;background:var(--navy3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:.88rem;"
+            onkeydown="if(event.key==='Enter')handleSignIn()">
+        </div>
+
+        <button id="auth-btn-email" onclick="handleSignIn()"
+          style="width:100%;padding:.72rem;border-radius:9px;border:none;background:var(--gold);color:#0b1120;font-family:'IBM Plex Sans',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;margin-bottom:.6rem;">
+          Entrar
+        </button>
+        <button id="auth-btn-register" onclick="handleSignUp()"
+          style="width:100%;display:none;padding:.72rem;border-radius:9px;border:1px solid var(--teal);background:transparent;color:var(--teal);font-family:'IBM Plex Sans',sans-serif;font-size:.88rem;font-weight:600;cursor:pointer;margin-bottom:.6rem;">
+          Crear cuenta
+        </button>
+
+        <div id="auth-err" style="display:none;"></div>
+
+        <div style="text-align:center;margin-top:.9rem;">
+          <span id="auth-toggle-lbl" style="font-size:.78rem;color:var(--text2);">¿No tienes cuenta? </span>
+          <button id="auth-toggle-btn" onclick="toggleAuthMode()" style="background:none;border:none;color:var(--teal);font-size:.78rem;font-weight:600;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;">Crear cuenta gratis</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:1rem;font-size:.72rem;color:var(--text2);opacity:.5;">
+      Tu data es privada y solo tú puedes verla
+    </div>
+  </div>
+</div>
+
 <script>
 // ═══════════════════════════════════════════════════════════
-//  CONFIGURACIÓN GOOGLE SHEETS
+//  SUPABASE — AUTH + DB
 // ═══════════════════════════════════════════════════════════
-// ── Supabase ──────────────────────────────────────────────────────────────
-const SB_URL   = 'https://tdcpdjhwvpkrxgmnpftv.supabase.co';
-const SB_KEY   = 'sb_publishable_ytx1M7anayE7g7_SnGQCxw_ZMjYNsnM';
-const SB_HDR   = { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' };
+const SB_URL = 'https://tdcpdjhwvpkrxgmnpftv.supabase.co';
+const SB_KEY = 'sb_publishable_ytx1M7anayE7g7_SnGQCxw_ZMjYNsnM';
+const sb     = supabase.createClient(SB_URL, SB_KEY);
+
+let SB_HDR = {};
+let currentUser = null;
+
+function buildHeaders(token) {
+  return {
+    'apikey': SB_KEY,
+    'Authorization': 'Bearer ' + (token || SB_KEY),
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation',
+  };
+}
+
+// ── Auth helpers ──────────────────────────────────────────
+async function signUp(email, password) {
+  const { data, error } = await sb.auth.signUp({ email, password });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+async function signIn(email, password) {
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+async function signInGoogle() {
+  const redirectTo = location.href.split('?')[0].split('#')[0];
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo }
+  });
+  if (error) throw new Error(error.message);
+}
+
+async function signOut() {
+  localStorage.removeItem(LS_KEY);
+  await sb.auth.signOut();
+  currentUser = null;
+  showAuthScreen();
+}
+
+function onAuthStateChange() {
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (session && session.user) {
+      currentUser = session.user;
+      SB_HDR = buildHeaders(session.access_token);
+      hideAuthScreen();
+      await initApp();
+    } else {
+      currentUser = null;
+      SB_HDR = buildHeaders(null);
+      showAuthScreen();
+    }
+  });
+}
+
+// ── Auth UI ───────────────────────────────────────────────
+function showAuthScreen() {
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('main-app').style.display = 'none';
+}
+
+function hideAuthScreen() {
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('main-app').style.display = 'flex';
+}
+
+async function handleSignIn() {
+  const email = document.getElementById('auth-email').value.trim();
+  const pass  = document.getElementById('auth-pass').value;
+  const btn   = document.getElementById('auth-btn-email');
+  const err   = document.getElementById('auth-err');
+  if (!email || !pass) { showAuthErr('Ingresa email y contraseña.'); return; }
+  btn.disabled = true; btn.textContent = '⟳ Entrando...';
+  try {
+    await signIn(email, pass);
+  } catch(e) {
+    showAuthErr(e.message.includes('Invalid') ? 'Email o contraseña incorrectos.' : e.message);
+    btn.disabled = false; btn.textContent = 'Entrar';
+  }
+}
+
+async function handleSignUp() {
+  const email = document.getElementById('auth-email').value.trim();
+  const pass  = document.getElementById('auth-pass').value;
+  const btn   = document.getElementById('auth-btn-register');
+  if (!email || !pass) { showAuthErr('Ingresa email y contraseña.'); return; }
+  if (pass.length < 6) { showAuthErr('La contraseña debe tener al menos 6 caracteres.'); return; }
+  btn.disabled = true; btn.textContent = '⟳ Creando cuenta...';
+  try {
+    await signUp(email, pass);
+    showAuthErr('✓ Cuenta creada. Revisa tu email para confirmar.', 'ok');
+  } catch(e) {
+    showAuthErr(e.message.includes('already') ? 'Este email ya tiene cuenta. Usa "Entrar".' : e.message);
+  }
+  btn.disabled = false; btn.textContent = 'Crear cuenta';
+}
+
+async function handleGoogleSignIn() {
+  const btn = document.getElementById('auth-btn-google');
+  btn.disabled = true; btn.textContent = '⟳ Redirigiendo...';
+  try { await signInGoogle(); }
+  catch(e) { showAuthErr(e.message); btn.disabled = false; btn.textContent = '🔵 Continuar con Google'; }
+}
+
+function showAuthErr(msg, type = 'error') {
+  const el = document.getElementById('auth-err');
+  el.style.cssText = type === 'ok'
+    ? 'display:block;background:rgba(68,201,126,.1);border:1px solid rgba(68,201,126,.25);color:#44c97e;padding:.6rem .9rem;border-radius:8px;font-size:.8rem;margin-top:.7rem;'
+    : 'display:block;background:rgba(224,92,92,.1);border:1px solid rgba(224,92,92,.25);color:#e05c5c;padding:.6rem .9rem;border-radius:8px;font-size:.8rem;margin-top:.7rem;';
+  el.textContent = msg;
+}
+
+function toggleAuthMode() {
+  const mode = document.getElementById('auth-mode').dataset.mode || 'login';
+  const newMode = mode === 'login' ? 'register' : 'login';
+  document.getElementById('auth-mode').dataset.mode = newMode;
+  document.getElementById('auth-title').textContent = newMode === 'login' ? 'Iniciar sesión' : 'Crear cuenta';
+  document.getElementById('auth-btn-email').textContent = newMode === 'login' ? 'Entrar' : '';
+  document.getElementById('auth-btn-email').style.display = newMode === 'login' ? 'block' : 'none';
+  document.getElementById('auth-btn-register').style.display = newMode === 'register' ? 'block' : 'none';
+  document.getElementById('auth-toggle-lbl').textContent = newMode === 'login' ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?';
+  document.getElementById('auth-toggle-btn').textContent = newMode === 'login' ? 'Crear cuenta gratis' : 'Iniciar sesión';
+  document.getElementById('auth-err').style.display = 'none';
+}
 
 // ═══════════════════════════════════════════════════════════
 //  STATE LOCAL (caché + fallback)
@@ -691,6 +892,7 @@ const LS_KEY = 'fve4';
 
 const lsLoad = () => { try { const d = localStorage.getItem(LS_KEY); if (d) S = { ...S, ...JSON.parse(d) }; } catch {} };
 const lsSave = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch {} };
+const lsSaveUser = () => { try { localStorage.setItem('fve4_' + (currentUser?.id||'anon'), JSON.stringify(S)); } catch {} };
 
 // ═══════════════════════════════════════════════════════════
 //  SUPABASE API LAYER
@@ -789,9 +991,12 @@ async function apiGet(accion, params = {}) {
 }
 
 async function apiPost(accion, body = {}) {
+  const uid = currentUser?.id;
+  if (!uid) throw new Error('No autenticado');
+
   if (accion === 'saveTasa') {
     const row = await sbUpsert('tasas_bcv',
-      { fecha: body.fecha, tasa: parseFloat(body.tasa), fuente: body.fuente || 'BCV Oficial' },
+      { fecha: body.fecha, tasa: parseFloat(body.tasa), fuente: body.fuente || 'BCV Oficial', user_id: uid },
       'fecha'
     );
     return { status: 'ok', data: { saved: true, fecha: row.fecha, tasa: row.tasa } };
@@ -800,12 +1005,12 @@ async function apiPost(accion, body = {}) {
     const row = await sbInsert('salarios', {
       fecha: body.fecha, tasa_dia: +body.tasa_dia,
       salario_bs: +body.salario_bs, salario_usd: +body.salario_usd,
-      bono1_bs: +body.bono1_bs, bono1_usd: +body.bono1_usd,
-      bono2_bs: +body.bono2_bs, bono2_usd: +body.bono2_usd,
+      bono1_bs: +body.bono1_bs,   bono1_usd: +body.bono1_usd,
+      bono2_bs: +body.bono2_bs,   bono2_usd: +body.bono2_usd,
       cesta_usd: +body.cesta_usd, cesta_bs: +body.cesta_bs,
-      ayuda_bs: +body.ayuda_bs, ayuda_usd: +body.ayuda_usd,
-      total_bs: +body.total_bs, total_usd: +body.total_usd,
-      notas: body.notas || '',
+      ayuda_bs: +body.ayuda_bs,   ayuda_usd: +body.ayuda_usd,
+      total_bs: +body.total_bs,   total_usd: +body.total_usd,
+      notas: body.notas || '', user_id: uid,
     });
     return { status: 'ok', data: { saved: true, id: row.id } };
   }
@@ -815,6 +1020,7 @@ async function apiPost(accion, body = {}) {
       categoria: body.categoria || 'Otro',
       monto_usd: +body.monto_usd, tasa_dia: +body.tasa_dia,
       monto_bs_dia: +body.monto_bs_dia, tipo: body.tipo || 'variable',
+      user_id: uid,
     });
     return { status: 'ok', data: { saved: true, id: row.id } };
   }
@@ -825,7 +1031,7 @@ async function apiPost(accion, body = {}) {
   if (accion === 'saveGastoFijo') {
     const row = await sbInsert('gastos_fijos', {
       descripcion: body.descripcion, categoria: body.categoria || 'Hogar',
-      monto_usd: +body.monto_usd, activo: true,
+      monto_usd: +body.monto_usd, activo: true, user_id: uid,
     });
     return { status: 'ok', data: { saved: true, id: row.id } };
   }
@@ -835,7 +1041,8 @@ async function apiPost(accion, body = {}) {
   }
   if (accion === 'saveConfig') {
     await sbUpsert('config',
-      { clave: body.clave, valor: String(body.valor), actualizado_en: new Date().toISOString() },
+      { clave: body.clave + '_' + uid, valor: String(body.valor),
+        actualizado_en: new Date().toISOString(), user_id: uid },
       'clave'
     );
     return { status: 'ok', data: { saved: true } };
@@ -1985,11 +2192,25 @@ function hideLoading() { document.getElementById('loading-overlay').classList.re
 // ═══════════════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════════════
-window.onload = async () => {
-  lsLoad();
+// initApp — llamado por onAuthStateChange cuando el usuario está logueado
+async function initApp() {
+  // Mostrar email/avatar del usuario
+  if (currentUser) {
+    const emailLbl = document.getElementById('user-email-lbl');
+    const avatar   = document.getElementById('user-avatar');
+    const userInfo = document.getElementById('user-info');
+    if (emailLbl) emailLbl.textContent = currentUser.email || currentUser.user_metadata?.full_name || '';
+    if (avatar)   avatar.textContent   = (currentUser.email || 'U')[0].toUpperCase();
+    if (userInfo) userInfo.style.display = 'flex';
+  }
+
+  // Resetear estado al cambiar de usuario
+  S = { bcv:0, bcvDate:'', salario:0, b1:0, b2:0, cusd:0, gastos:[], gastosFijos:[], tasasHistoricas:[], salarios:[], tasaVista:0 };
+  const LS_KEY_USER = 'fve4_' + (currentUser?.id || 'anon');
+  try { const d = localStorage.getItem(LS_KEY_USER); if (d) S = { ...S, ...JSON.parse(d) }; } catch {}
+
   const hoy = new Date().toISOString().split('T')[0];
   document.getElementById('g-f').value = hoy;
-  // Inicializar tasa del día para el formulario de gastos
   gTasaDiaActual = S.bcv || 0;
   if (S.bcv > 0) {
     setTasaBox('ok', S.bcv, hoy, '✓ Tasa activa (hoy)');
@@ -2001,109 +2222,101 @@ window.onload = async () => {
   const mesActual = hoy.slice(0, 7);
   document.getElementById('g-mes-filtro').value = mesActual;
 
-  if (S.bcv) { document.getElementById('inp-bcv').value = S.bcv; document.getElementById('inp-dt').value = S.bcvDate || hoy; }
+  if (S.bcv)     { document.getElementById('inp-bcv').value = S.bcv; document.getElementById('inp-dt').value = S.bcvDate || hoy; }
   if (S.salario) document.getElementById('inp-sal').value = S.salario;
-  if (S.b1) document.getElementById('inp-b1').value = S.b1;
-  if (S.b2) document.getElementById('inp-b2').value = S.b2;
-  if (S.cusd) document.getElementById('inp-cu').value = S.cusd;
+  if (S.b1)      document.getElementById('inp-b1').value  = S.b1;
+  if (S.b2)      document.getElementById('inp-b2').value  = S.b2;
+  if (S.cusd)    document.getElementById('inp-cu').value  = S.cusd;
 
   updateHdr(); liveCalc(); setCur('usd');
   S.tasaVista = S.bcv;
-
   if (S.bcv && S.salario) { renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos(); }
 
-  // Sincronizar con Supabase en background
+  // Sincronizar con Supabase
   setSyncState('loading', 'Conectando...');
-  showLoading('Sincronizando con Supabase...');
+  showLoading('Cargando tu data...');
   try {
-    // Cargar tasas históricas
     const resTasas = await apiGet('getTasas');
     if (resTasas.status === 'ok' && resTasas.data) {
       S.tasasHistoricas = resTasas.data
-        .map(t => ({ fecha: String(t.fecha || ''), tasa: parseFloat(t.tasa) || 0, fuente: t.fuente || 'BCV' }))
+        .map(t => ({ fecha: String(t.fecha||''), tasa: parseFloat(t.tasa)||0, fuente: t.fuente||'BCV' }))
         .filter(t => t.fecha && t.tasa > 0)
-        .sort((a, b) => b.fecha.localeCompare(a.fecha));
+        .sort((a,b) => b.fecha.localeCompare(a.fecha));
     }
 
-    // Cargar gastos fijos
     const resFijos = await apiGet('getGastosFijos');
     if (resFijos.status === 'ok' && resFijos.data) {
-      S.gastosFijos = resFijos.data.map(g => ({ ...g, monto_usd: parseFloat(g.monto_usd) || 0, activo: g.activo === true || g.activo === 'TRUE' }));
+      S.gastosFijos = resFijos.data.map(g => ({ ...g, monto_usd: parseFloat(g.monto_usd)||0, activo: g.activo === true || g.activo === 'TRUE' }));
     }
 
-    // Cargar config guardada
     const resCfg = await apiGet('getConfig');
     if (resCfg.status === 'ok' && resCfg.data) {
       const cfg = resCfg.data;
       if (cfg.bcv && !S.bcv) { S.bcv = parseFloat(cfg.bcv); S.bcvDate = cfg.bcvDate || hoy; }
     }
 
-    // Cargar gastos — sin filtro de mes en el init para sincronizar TODO desde Sheets
-    // El filtro por mes solo aplica al botón manual "Cargar mes"
     const resGastos = await apiGet('getGastos');
     if (resGastos.status === 'ok' && Array.isArray(resGastos.data)) {
-      const deSheets = resGastos.data.map(g => ({
-        ...g,
-        id: String(g.id || ''),
-        monto_usd:    parseFloat(g.monto_usd)    || 0,
-        tasa_dia:     parseFloat(g.tasa_dia)     || S.bcv,
-        monto_bs_dia: parseFloat(g.monto_bs_dia) || 0,
+      const deSB = resGastos.data.map(g => ({
+        ...g, id: String(g.id||''),
+        monto_usd:    parseFloat(g.monto_usd)||0,
+        tasa_dia:     parseFloat(g.tasa_dia)||S.bcv,
+        monto_bs_dia: parseFloat(g.monto_bs_dia)||0,
       }));
-      // Gastos locales pendientes de sync que aún no están en Sheets
-      const idsSheets = new Set(deSheets.map(g => g.id));
-      const pendientes = S.gastos.filter(g =>
-        String(g.id || '').startsWith('gto_') && !idsSheets.has(String(g.id))
-      );
-      S.gastos = [...deSheets, ...pendientes];
-      // Mostrar el mes actual por defecto en el filtro visual
+      const idsSB = new Set(deSB.map(g => g.id));
+      const pendientes = S.gastos.filter(g => String(g.id||'').startsWith('gto_') && !idsSB.has(String(g.id)));
+      S.gastos = [...deSB, ...pendientes];
       S.gastos_mes_visible = mesActual;
     }
 
-    // Cargar historial de salarios
     const resSal = await apiGet('getSalarios');
     if (resSal.status === 'ok' && resSal.data) {
-      S.salarios = resSal.data.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
-      // Restaurar último salario si no hay en local
+      S.salarios = resSal.data.sort((a,b) => String(b.fecha||'').localeCompare(String(a.fecha||'')));
       if (!S.salario && S.salarios.length) {
         const ult = S.salarios[0];
-        S.salario = parseFloat(ult.salario_bs) || 0;
-        S.b1 = parseFloat(ult.bono1_bs) || 0;
-        S.b2 = parseFloat(ult.bono2_bs) || 0;
-        S.cusd = parseFloat(ult.cesta_usd) || 0;
-        S.bcv = parseFloat(ult.tasa_dia) || S.bcv;
+        S.salario = parseFloat(ult.salario_bs)||0;
+        S.b1  = parseFloat(ult.bono1_bs)||0;
+        S.b2  = parseFloat(ult.bono2_bs)||0;
+        S.cusd = parseFloat(ult.cesta_usd)||0;
+        S.bcv = parseFloat(ult.tasa_dia)||S.bcv;
         document.getElementById('inp-sal').value = S.salario;
-        document.getElementById('inp-b1').value = S.b1;
-        document.getElementById('inp-b2').value = S.b2;
-        document.getElementById('inp-cu').value = S.cusd;
+        document.getElementById('inp-b1').value  = S.b1;
+        document.getElementById('inp-b2').value  = S.b2;
+        document.getElementById('inp-cu').value  = S.cusd;
         document.getElementById('inp-bcv').value = S.bcv;
       }
     }
 
-    lsSave();
+    try { localStorage.setItem('fve4_' + (currentUser?.id||'anon'), JSON.stringify(S)); } catch {}
     updateHdr(); liveCalc(); poblarSelectorTasas();
     renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos();
     setSyncState('ok');
 
   } catch (err) {
     setSyncState('err', 'Sin conexión');
-    // Si hay datos locales, usarlos
     if (S.bcv && S.salario) { renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos(); }
   }
   hideLoading();
 
-  // Auto-fetch BCV si no hay tasa
   if (!S.bcv) {
     setTimeout(async () => {
       const { rate, fecha, fuente } = await fetchBCV();
       if (rate) {
-        S.bcv = rate; S.bcvDate = fecha || hoy; lsSave(); updateHdr();
+        S.bcv = rate; S.bcvDate = fecha || hoy;
+        try { localStorage.setItem('fve4_' + (currentUser?.id||'anon'), JSON.stringify(S)); } catch {}
+        updateHdr();
         document.getElementById('inp-bcv').value = rate.toFixed(2);
-        document.getElementById('inp-dt').value = S.bcvDate;
+        document.getElementById('inp-dt').value  = S.bcvDate;
         liveCalc();
         showStatus('cfg-status', 'ok', `✓ Tasa ${fuente}: Bs. ${N(rate)} cargada automáticamente`);
       }
     }, 500);
   }
+}
+
+// window.onload — solo lanza el listener de auth
+window.onload = () => {
+  onAuthStateChange();
 };
 
 // ═══════════════════════════════════════════════════════════
