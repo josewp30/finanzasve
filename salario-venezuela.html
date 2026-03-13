@@ -10,8 +10,8 @@
 <meta name="theme-color" content="#0b1120">
 <title>FinanzasVE</title>
 
-<!-- PWA Manifest inline -->
-<link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22FinanzasVE%22%2C%22short_name%22%3A%22FinanzasVE%22%2C%22description%22%3A%22Gestor%20de%20finanzas%20personales%20venezolano%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230b1120%22%2C%22theme_color%22%3A%22%230b1120%22%2C%22orientation%22%3A%22portrait%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%253D'http%253A%252F%252Fwww.w3.org%252F2000%252Fsvg'%2520viewBox%253D'0%25200%252096%252096'%253E%253Crect%2520width%253D'96'%2520height%253D'96'%2520rx%253D'18'%2520fill%253D'%25230b1120'%252F%253E%253Ctext%2520x%253D'48'%2520y%253D'62'%2520text-anchor%253D'middle'%2520font-size%253D'52'%253E%25F0%259F%2587%25BB%253C%252Ftext%253E%253C%252Fsvg%253E%22%2C%22sizes%22%3A%22any%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%2C%22purpose%22%3A%22any%20maskable%22%7D%5D%7D">
+<!-- PWA Manifest -->
+<link rel="manifest" href="manifest.json">
 
 <!-- Apple touch icon inline SVG → PNG via canvas -->
 <link rel="apple-touch-icon" id="apple-icon" href="">
@@ -2107,87 +2107,59 @@ window.onload = async () => {
 };
 
 // ═══════════════════════════════════════════════════════════
-//  PWA — Service Worker + Install prompt
+//  PWA — Service Worker externo + Install prompt
 // ═══════════════════════════════════════════════════════════
 (function initPWA() {
-  // Generar ícono PNG dinámico para Apple touch icon
-  function makeIcon() {
+  // Ícono canvas para Apple
+  function makeIcon(size) {
     const c = document.createElement('canvas');
-    c.width = c.height = 192;
+    c.width = c.height = size;
     const ctx = c.getContext('2d');
-    // Fondo navy
+    const r = size * 0.18;
     ctx.fillStyle = '#0b1120';
-    const r = 36;
     ctx.beginPath();
-    ctx.moveTo(r, 0); ctx.lineTo(192-r, 0);
-    ctx.quadraticCurveTo(192, 0, 192, r);
-    ctx.lineTo(192, 192-r); ctx.quadraticCurveTo(192, 192, 192-r, 192);
-    ctx.lineTo(r, 192); ctx.quadraticCurveTo(0, 192, 0, 192-r);
-    ctx.lineTo(0, r); ctx.quadraticCurveTo(0, 0, r, 0);
+    ctx.moveTo(r,0); ctx.lineTo(size-r,0);
+    ctx.quadraticCurveTo(size,0,size,r);
+    ctx.lineTo(size,size-r); ctx.quadraticCurveTo(size,size,size-r,size);
+    ctx.lineTo(r,size); ctx.quadraticCurveTo(0,size,0,size-r);
+    ctx.lineTo(0,r); ctx.quadraticCurveTo(0,0,r,0);
     ctx.closePath(); ctx.fill();
-    // Texto "₿VE" en gold
     ctx.fillStyle = '#c8a84b';
-    ctx.font = 'bold 58px sans-serif';
+    ctx.font = `bold ${Math.round(size*0.3)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('FVE', 96, 96);
+    ctx.fillText('FVE', size/2, size/2);
     return c.toDataURL('image/png');
   }
-
-  // Poner ícono Apple
   const appleIcon = document.getElementById('apple-icon');
-  if (appleIcon) appleIcon.href = makeIcon();
+  if (appleIcon) appleIcon.href = makeIcon(180);
 
-  // Registrar Service Worker inline via Blob para funcionar desde file:// y GitHub Pages
-  const swCode = `
-    const CACHE = 'finanzasve-v1';
-    const PRECACHE = [];
-    self.addEventListener('install', e => { self.skipWaiting(); });
-    self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
-    self.addEventListener('fetch', e => {
-      // Solo cachear mismo origen, no Supabase ni APIs externas
-      if (!e.request.url.startsWith(self.location.origin)) return;
-      e.respondWith(
-        caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
-          const clone = res.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-          return res;
-        }))
-      );
-    });
-  `;
-  const blob = new Blob([swCode], { type: 'application/javascript' });
-  const swUrl = URL.createObjectURL(blob);
-
+  // Registrar sw.js externo (debe estar en la misma carpeta en GitHub)
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register(swUrl, { scope: './' })
-      .then(() => console.log('[PWA] Service Worker registrado'))
-      .catch(e => console.log('[PWA] SW no disponible:', e.message));
+    navigator.serviceWorker.register('./sw.js')
+      .then(r => console.log('[PWA] SW registrado, scope:', r.scope))
+      .catch(e => console.warn('[PWA] SW falló:', e.message));
   }
 
-  // Banner de instalación para Android Chrome
+  // Prompt de instalación Android Chrome
   let deferredPrompt = null;
   window.addEventListener('beforeinstallprompt', e => {
     e.preventDefault();
     deferredPrompt = e;
-    // Mostrar botón de instalación en topbar
     const btn = document.getElementById('pwa-install-btn');
-    if (btn) { btn.style.display = 'flex'; }
+    if (btn) btn.style.display = 'flex';
   });
-
   window.addEventListener('appinstalled', () => {
+    deferredPrompt = null;
     const btn = document.getElementById('pwa-install-btn');
     if (btn) btn.style.display = 'none';
-    deferredPrompt = null;
   });
-
   window.installPWA = async () => {
     if (!deferredPrompt) {
-      alert('Para instalar en iOS:\n1. Toca el botón Compartir (□↑)\n2. Selecciona "Añadir a pantalla de inicio"');
+      alert('En iPhone/iPad:\n1. Toca el botón Compartir \u{1F4E4}\n2. Selecciona "Añadir a pantalla de inicio"');
       return;
     }
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
+    await deferredPrompt.prompt();
     deferredPrompt = null;
     const btn = document.getElementById('pwa-install-btn');
     if (btn) btn.style.display = 'none';
