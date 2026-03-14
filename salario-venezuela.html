@@ -790,7 +790,14 @@ input::placeholder{color:var(--text2);font-family:'IBM Plex Sans',sans-serif;}
 // ═══════════════════════════════════════════════════════════
 const SB_URL = 'https://tdcpdjhwvpkrxgmnpftv.supabase.co';
 const SB_KEY = 'sb_publishable_ytx1M7anayE7g7_SnGQCxw_ZMjYNsnM';
-const sb     = supabase.createClient(SB_URL, SB_KEY);
+const sb     = supabase.createClient(SB_URL, SB_KEY, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,   // ← captura el token que Google devuelve en la URL
+    flowType: 'implicit',       // ← modo compatible con apps de una sola página
+  }
+});
 
 let SB_HDR = {};
 let currentUser = null;
@@ -818,20 +825,23 @@ async function signIn(email, password) {
 }
 
 async function signInGoogle() {
-  const redirectTo = location.href.split('?')[0].split('#')[0];
+  const base = location.href.split('?')[0].split('#')[0];
   const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo }
+    options: { redirectTo: base }
   });
   if (error) throw new Error(error.message);
 }
 
 async function signOut() {
   localStorage.removeItem(LS_KEY);
+  appInitialized = false;
   await sb.auth.signOut();
   currentUser = null;
   showAuthScreen();
 }
+
+let appInitialized = false;
 
 function onAuthStateChange() {
   sb.auth.onAuthStateChange(async (event, session) => {
@@ -839,9 +849,13 @@ function onAuthStateChange() {
       currentUser = session.user;
       SB_HDR = buildHeaders(session.access_token);
       hideAuthScreen();
-      await initApp();
-    } else {
+      if (!appInitialized) {
+        appInitialized = true;
+        await initApp();
+      }
+    } else if (event === 'SIGNED_OUT' || (!session && event !== 'INITIAL_SESSION')) {
       currentUser = null;
+      appInitialized = false;
       SB_HDR = buildHeaders(null);
       showAuthScreen();
     }
@@ -944,41 +958,55 @@ function setSyncState(state, msg) {
   const dot = document.getElementById('sync-dot');
   const lbl = document.getElementById('sync-lbl');
   dot.className = 'sync-dot ' + (state === 'ok' ? 'ok' : state === 'err' ? 'err' : 'loading');
-  lbl.textContent = msg || (state === 'ok' ? 'Sincronizado' : state === 'err' ? 'Sin conexión' : 'Sincronizando...');
+  if (lbl) lbl.textContent = msg || (state === 'ok' ? 'Sincronizado' : state === 'err' ? 'Sin conexión' : 'Sincronizando...');
 }
 
-// GET — select rows con filtros opcionales (objeto {col: val})
+// Siempre obtiene el token fresco de la sesión activa
+async function getHdrs(extra = {}) {
+  const { data } = await sb.auth.getSession();
+  const token = data?.session?.access_token || SB_KEY;
+  return {
+    'apikey': SB_KEY,
+    'Authorization': 'Bearer ' + token,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation',
+    ...extra,
+  };
+}
+
+// GET — select rows
 async function sbGet(tabla, filtros = {}) {
   const url = new URL(`${SB_URL}/rest/v1/${tabla}`);
   url.searchParams.set('select', '*');
   Object.entries(filtros).forEach(([k, v]) => url.searchParams.set(k, `eq.${v}`));
-  const r = await fetch(url.toString(), { headers: SB_HDR, signal: AbortSignal.timeout(10000) });
+  const hdrs = await getHdrs();
+  const r = await fetch(url.toString(), { headers: hdrs, signal: AbortSignal.timeout(20000) });
   if (!r.ok) { const t = await r.text(); throw new Error(`sbGet ${tabla}: ${r.status} ${t}`); }
-  return r.json(); // devuelve array directo
+  return r.json();
 }
 
-// INSERT — devuelve el registro insertado con id real
+// INSERT
 async function sbInsert(tabla, datos) {
+  const hdrs = await getHdrs();
   const r = await fetch(`${SB_URL}/rest/v1/${tabla}`, {
-    method: 'POST',
-    headers: SB_HDR,
+    method: 'POST', headers: hdrs,
     body: JSON.stringify(datos),
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(20000),
   });
   if (!r.ok) { const t = await r.text(); throw new Error(`sbInsert ${tabla}: ${r.status} ${t}`); }
   const rows = await r.json();
   return Array.isArray(rows) ? rows[0] : rows;
 }
 
-// UPSERT — insert o update por conflict en columna única
+// UPSERT
 async function sbUpsert(tabla, datos, onConflict = 'id') {
   const url = new URL(`${SB_URL}/rest/v1/${tabla}`);
   url.searchParams.set('on_conflict', onConflict);
+  const hdrs = await getHdrs({ 'Prefer': 'return=representation,resolution=merge-duplicates' });
   const r = await fetch(url.toString(), {
-    method: 'POST',
-    headers: { ...SB_HDR, 'Prefer': 'return=representation,resolution=merge-duplicates' },
+    method: 'POST', headers: hdrs,
     body: JSON.stringify(datos),
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(20000),
   });
   if (!r.ok) { const t = await r.text(); throw new Error(`sbUpsert ${tabla}: ${r.status} ${t}`); }
   const rows = await r.json();
@@ -989,10 +1017,10 @@ async function sbUpsert(tabla, datos, onConflict = 'id') {
 async function sbDelete(tabla, id) {
   const url = new URL(`${SB_URL}/rest/v1/${tabla}`);
   url.searchParams.set('id', `eq.${id}`);
+  const hdrs = await getHdrs();
   const r = await fetch(url.toString(), {
-    method: 'DELETE',
-    headers: SB_HDR,
-    signal: AbortSignal.timeout(10000),
+    method: 'DELETE', headers: hdrs,
+    signal: AbortSignal.timeout(20000),
   });
   if (!r.ok) { const t = await r.text(); throw new Error(`sbDelete ${tabla}: ${r.status} ${t}`); }
   return true;
@@ -1011,23 +1039,16 @@ async function apiGet(accion, params = {}) {
     return { status: 'ok', data: cfg };
   }
   if (accion === 'getGastos') {
-    if (params.mes) {
-      // Supabase: filtro por rango — usa parámetros separados con nombre distinto
-      const url = new URL(`${SB_URL}/rest/v1/gastos`);
-      url.searchParams.set('select', '*');
-      url.searchParams.set('fecha', `gte.${params.mes}-01`);
-      url.searchParams.append('fecha', `lte.${params.mes}-31`);
-      url.searchParams.set('order', 'fecha.desc');
-      const r = await fetch(url.toString(), { headers: SB_HDR, signal: AbortSignal.timeout(10000) });
-      if (!r.ok) throw new Error('getGastos: ' + r.status);
-      return { status: 'ok', data: await r.json() };
-    }
-    // Sin filtro — todos los gastos ordenados por fecha desc
+    const hdrs = await getHdrs();
     const url = new URL(`${SB_URL}/rest/v1/gastos`);
     url.searchParams.set('select', '*');
     url.searchParams.set('order', 'fecha.desc');
-    const r = await fetch(url.toString(), { headers: SB_HDR, signal: AbortSignal.timeout(10000) });
-    if (!r.ok) throw new Error('getGastos all: ' + r.status);
+    if (params.mes) {
+      url.searchParams.set('fecha', `gte.${params.mes}-01`);
+      url.searchParams.append('fecha', `lte.${params.mes}-31`);
+    }
+    const r = await fetch(url.toString(), { headers: hdrs, signal: AbortSignal.timeout(20000) });
+    if (!r.ok) throw new Error('getGastos: ' + r.status);
     return { status: 'ok', data: await r.json() };
   }
   throw new Error('apiGet acción desconocida: ' + accion);
@@ -1040,7 +1061,7 @@ async function apiPost(accion, body = {}) {
   if (accion === 'saveTasa') {
     const row = await sbUpsert('tasas_bcv',
       { fecha: body.fecha, tasa: parseFloat(body.tasa), fuente: body.fuente || 'BCV Oficial', user_id: uid },
-      'fecha'
+      'fecha,user_id'
     );
     return { status: 'ok', data: { saved: true, fecha: row.fecha, tasa: row.tasa } };
   }
