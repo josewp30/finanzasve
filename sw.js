@@ -1,7 +1,10 @@
-// FinanzasVE — Service Worker v1.0
-const CACHE = 'finanzasve-v1';
+// FinanzasVE — Service Worker v1.1
+const CACHE = 'finanzasve-v1.1';
 
-self.addEventListener('install', e => { self.skipWaiting(); });
+self.addEventListener('install', e => {
+  // NO skipWaiting aquí — esperamos confirmación del usuario
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll([])));
+});
 
 self.addEventListener('activate', e => {
   e.waitUntil(
@@ -11,8 +14,12 @@ self.addEventListener('activate', e => {
   );
 });
 
+// El cliente pide activar la nueva versión
+self.addEventListener('message', e => {
+  if (e.data?.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
 // Network first — caché como fallback offline
-// No intercepta Supabase ni APIs externas
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (!url.href.includes('github.io') && url.origin !== self.location.origin) return;

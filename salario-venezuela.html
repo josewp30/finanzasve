@@ -33,21 +33,46 @@ html{font-size:15px;}
 body{font-family:'IBM Plex Sans',sans-serif;background:var(--navy);color:var(--text);min-height:100vh;}
 
 /* TOP BAR */
-.topbar{position:sticky;top:0;z-index:200;background:var(--navy2);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;height:60px;}
-.logo{font-size:1.1rem;font-weight:600;letter-spacing:.06em;color:#fff;}
+.topbar{position:sticky;top:0;z-index:200;background:rgba(11,17,32,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 1.2rem;height:56px;}
+.logo{font-size:1.05rem;font-weight:600;letter-spacing:.06em;color:#fff;flex-shrink:0;}
 .logo span{color:var(--gold);}
-.topbar-right{display:flex;align-items:center;gap:.75rem;}
-.bcv-pill{display:flex;align-items:center;gap:.5rem;background:var(--navy3);border:1px solid var(--border);border-radius:8px;padding:.35rem .85rem;cursor:pointer;transition:border-color .2s;}
-.bcv-pill:hover{border-color:var(--gold);}
-.pulse{width:7px;height:7px;border-radius:50%;background:var(--gold);animation:blink 2.5s ease-in-out infinite;}
+
+/* BCV pill — centro del topbar */
+.bcv-pill{display:flex;align-items:center;gap:.45rem;background:rgba(200,168,75,.07);border:1px solid rgba(200,168,75,.2);border-radius:20px;padding:.28rem .85rem;cursor:pointer;transition:all .2s;}
+.bcv-pill:hover{background:rgba(200,168,75,.13);border-color:rgba(200,168,75,.4);}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--gold);flex-shrink:0;animation:blink 2.5s ease-in-out infinite;}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
-.bcv-pill .lbl{font-size:.72rem;color:var(--text2);letter-spacing:.04em;}
-.bcv-pill .rate{font-family:'IBM Plex Mono',monospace;font-size:.88rem;color:var(--gold2);font-weight:500;}
-.bcv-pill .dt{font-size:.68rem;color:var(--text2);}
-.sync-indicator{display:flex;align-items:center;gap:.4rem;font-size:.72rem;color:var(--text2);padding:.3rem .7rem;border-radius:6px;background:var(--navy3);border:1px solid var(--border);}
-.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--text2);}
+.bcv-pill .lbl{font-size:.68rem;color:var(--text2);letter-spacing:.05em;text-transform:uppercase;}
+.bcv-pill .rate{font-family:'IBM Plex Mono',monospace;font-size:.85rem;color:var(--gold2);font-weight:500;}
+
+/* Avatar estilo red social */
+.topbar-right{display:flex;align-items:center;gap:.6rem;}
+.user-menu{position:relative;display:flex;align-items:center;gap:.55rem;}
+.avatar-btn{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--teal));color:#0b1120;font-weight:700;font-size:.82rem;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid rgba(200,168,75,.3);flex-shrink:0;transition:border-color .2s;user-select:none;}
+.avatar-btn:hover{border-color:var(--gold);}
+.user-name{font-size:.78rem;color:var(--text2);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.user-dropdown{position:absolute;top:calc(100% + 10px);right:0;min-width:210px;background:var(--navy2);border:1px solid var(--border);border-radius:12px;padding:.5rem;box-shadow:0 8px 32px rgba(0,0,0,.5);z-index:500;display:none;}
+.user-dropdown.open{display:block;animation:fadeIn .15s ease;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.ud-header{padding:.6rem .8rem .5rem;border-bottom:1px solid var(--border);margin-bottom:.3rem;}
+.ud-name{font-size:.82rem;font-weight:600;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ud-email{font-size:.72rem;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ud-item{display:flex;align-items:center;gap:.55rem;padding:.55rem .8rem;border-radius:8px;cursor:pointer;font-size:.82rem;color:var(--text2);transition:background .15s;border:none;background:none;width:100%;font-family:'IBM Plex Sans',sans-serif;text-align:left;}
+.ud-item:hover{background:var(--navy3);color:var(--text);}
+.ud-item.danger{color:var(--red);}
+.ud-item.danger:hover{background:rgba(224,92,92,.08);}
+
+/* Sync dot — solo el dot, sin texto en mobile */
+.sync-dot{width:7px;height:7px;border-radius:50%;background:var(--text2);flex-shrink:0;}
 .sync-dot.ok{background:var(--green);}
 .sync-dot.err{background:var(--red);}
+.sync-dot.loading{background:var(--gold);animation:blink 1s ease-in-out infinite;}
+.sync-indicator{display:flex;align-items:center;gap:.4rem;font-size:.72rem;color:var(--text2);}
+
+/* Banner actualización */
+.update-banner{display:none;position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%);z-index:800;background:var(--navy2);border:1px solid var(--teal);border-radius:12px;padding:.7rem 1.1rem;box-shadow:0 6px 24px rgba(0,0,0,.5);align-items:center;gap:.8rem;font-size:.82rem;white-space:nowrap;}
+.update-banner.show{display:flex;animation:slideUp .3s ease;}
+@keyframes slideUp{from{opacity:0;transform:translateX(-50%) translateY(12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 .sync-dot.loading{background:var(--gold);animation:blink 1s infinite;}
 
 /* LAYOUT */
@@ -206,36 +231,52 @@ input::placeholder{color:var(--text2);font-family:'IBM Plex Sans',sans-serif;}
 <!-- TOP BAR -->
 <div class="topbar">
   <div class="logo">FINANZAS<span>VE</span></div>
+
+  <!-- BCV pill centrado -->
+  <div class="bcv-pill" onclick="openModal('modal-bcv')" title="Gestionar tasa BCV">
+    <div class="pulse"></div>
+    <span class="lbl">BCV</span>
+    <span class="rate" id="hdr-rate">— Bs./$</span>
+  </div>
+
   <div class="topbar-right">
-      <!-- Usuario logueado -->
-      <div id="user-info" style="display:none;align-items:center;gap:.5rem;font-size:.75rem;color:var(--text2);">
-        <div id="user-avatar" style="width:26px;height:26px;border-radius:50%;background:var(--gold);color:#0b1120;font-weight:700;font-size:.7rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;"></div>
-        <span id="user-email-lbl" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
-        <button onclick="signOut()" style="padding:.25rem .55rem;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:.7rem;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;">Salir</button>
-      </div>
-      <!-- Botón instalar PWA — solo visible cuando el navegador lo permite -->
-      <button id="pwa-install-btn" onclick="installPWA()" style="display:none;align-items:center;gap:.4rem;padding:.35rem .8rem;border-radius:7px;border:1px solid rgba(200,168,75,.3);background:rgba(200,168,75,.1);color:var(--gold2);font-family:'IBM Plex Sans',sans-serif;font-size:.75rem;font-weight:600;cursor:pointer;">
-        ⬇ Instalar app
-      </button>
+    <!-- Sync dot -->
     <div class="sync-indicator" id="sync-indicator">
       <div class="sync-dot" id="sync-dot"></div>
-      <span id="sync-lbl">Offline</span>
     </div>
-    <div class="bcv-pill" onclick="openModal('modal-bcv')" title="Click para gestionar tasa BCV">
-      <div class="pulse"></div>
-      <span class="lbl">BCV</span>
-      <span class="rate" id="hdr-rate">— Bs./$</span>
-      <span class="dt" id="hdr-dt"></span>
+
+    <!-- Instalar PWA -->
+    <button id="pwa-install-btn" onclick="installPWA()" style="display:none;align-items:center;gap:.35rem;padding:.3rem .7rem;border-radius:16px;border:1px solid rgba(200,168,75,.3);background:rgba(200,168,75,.08);color:var(--gold2);font-family:'IBM Plex Sans',sans-serif;font-size:.72rem;font-weight:600;cursor:pointer;">
+      ↓ Instalar
+    </button>
+
+    <!-- Avatar + dropdown estilo red social -->
+    <div class="user-menu" id="user-info" style="display:none;">
+      <div class="avatar-btn" id="user-avatar" onclick="toggleUserMenu()"></div>
+      <div class="user-dropdown" id="user-dropdown">
+        <div class="ud-header">
+          <div class="ud-name" id="user-display-name"></div>
+          <div class="ud-email" id="user-email-lbl"></div>
+        </div>
+        <button class="ud-item" onclick="installPWA();toggleUserMenu()">↓ Instalar app</button>
+        <button class="ud-item danger" onclick="signOut()">← Cerrar sesión</button>
+      </div>
     </div>
   </div>
+</div>
+
+<!-- Banner actualización SW -->
+<div class="update-banner" id="update-banner">
+  <span>🆕 Nueva versión disponible</span>
+  <button onclick="applyUpdate()" style="padding:.35rem .9rem;border-radius:8px;border:none;background:var(--teal);color:#0b1120;font-family:'IBM Plex Sans',sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;">Actualizar</button>
+  <button onclick="document.getElementById('update-banner').classList.remove('show')" style="padding:.35rem .6rem;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'IBM Plex Sans',sans-serif;font-size:.8rem;cursor:pointer;">Luego</button>
 </div>
 
 <div id="main-app" style="display:none;flex-direction:column;">
 <div class="layout">
   <nav class="sidebar">
     <div class="nav-sec">Principal</div>
-    <button class="nav-btn active" onclick="nav(this,'config')"><span class="ic">⚙</span><span class="nav-lbl">Configuración</span></button>
-    <button class="nav-btn" onclick="nav(this,'resumen')"><span class="ic">◈</span><span class="nav-lbl">Resumen</span></button>
+    <button class="nav-btn active" onclick="nav(this,'resumen')"><span class="ic">◈</span><span class="nav-lbl">Resumen</span></button>
     <div class="nav-sec">Pagos</div>
     <button class="nav-btn" onclick="nav(this,'semanal')"><span class="ic">▦</span><span class="nav-lbl">Calendario</span></button>
     <div class="nav-sec">Análisis</div>
@@ -245,6 +286,8 @@ input::placeholder{color:var(--text2);font-family:'IBM Plex Sans',sans-serif;}
     <div class="nav-sec">Histórico</div>
     <button class="nav-btn" onclick="nav(this,'htasas')"><span class="ic">📈</span><span class="nav-lbl">Tasas</span></button>
     <button class="nav-btn" onclick="nav(this,'hsalarios')"><span class="ic">💼</span><span class="nav-lbl">Salarios</span></button>
+    <div class="nav-sec">Ajustes</div>
+    <button class="nav-btn" onclick="nav(this,'config')"><span class="ic">⚙</span><span class="nav-lbl">Configuración</span></button>
   </nav>
 
   <main class="content">
@@ -252,7 +295,7 @@ input::placeholder{color:var(--text2);font-family:'IBM Plex Sans',sans-serif;}
     <!-- ═══════════════════════════════════════════════
          CONFIG
     ════════════════════════════════════════════════ -->
-    <div class="page active" id="page-config">
+    <div class="page" id="page-config">
       <div class="pg-title">Configuración de Ingresos</div>
       <div class="pg-sub">Define tu estructura salarial. Al guardar, se registra un snapshot con la tasa BCV del día.</div>
 
@@ -322,7 +365,7 @@ input::placeholder{color:var(--text2);font-family:'IBM Plex Sans',sans-serif;}
     <!-- ═══════════════════════════════════════════════
          RESUMEN
     ════════════════════════════════════════════════ -->
-    <div class="page" id="page-resumen">
+    <div class="page active" id="page-resumen">
       <div class="pg-title">Resumen Mensual</div>
       <div class="pg-sub">Consolidado de ingresos. <span style="color:var(--teal);">USD primario</span> · <span style="color:var(--gold2);">Bs. referencia</span></div>
       <!-- Selector de tasa histórica -->
@@ -2196,11 +2239,17 @@ function hideLoading() { document.getElementById('loading-overlay').classList.re
 async function initApp() {
   // Mostrar email/avatar del usuario
   if (currentUser) {
-    const emailLbl = document.getElementById('user-email-lbl');
-    const avatar   = document.getElementById('user-avatar');
-    const userInfo = document.getElementById('user-info');
-    if (emailLbl) emailLbl.textContent = currentUser.email || currentUser.user_metadata?.full_name || '';
-    if (avatar)   avatar.textContent   = (currentUser.email || 'U')[0].toUpperCase();
+    const email     = currentUser.email || '';
+    const name      = currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || '';
+    const initials  = name ? name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)
+                           : email.slice(0,2).toUpperCase();
+    const avatar    = document.getElementById('user-avatar');
+    const emailLbl  = document.getElementById('user-email-lbl');
+    const nameLbl   = document.getElementById('user-display-name');
+    const userInfo  = document.getElementById('user-info');
+    if (avatar)   avatar.textContent  = initials;
+    if (emailLbl) emailLbl.textContent = email;
+    if (nameLbl)  nameLbl.textContent  = name || email.split('@')[0];
     if (userInfo) userInfo.style.display = 'flex';
   }
 
@@ -2322,6 +2371,30 @@ window.onload = () => {
 // ═══════════════════════════════════════════════════════════
 //  PWA — Service Worker externo + Install prompt
 // ═══════════════════════════════════════════════════════════
+// Toggle dropdown usuario
+function toggleUserMenu() {
+  const dd = document.getElementById('user-dropdown');
+  if (dd) dd.classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  const menu = document.getElementById('user-dropdown');
+  const btn  = document.getElementById('user-avatar');
+  if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) {
+    menu.classList.remove('open');
+  }
+});
+
+// Auto-actualización SW
+let swWaitingWorker = null;
+function applyUpdate() {
+  if (swWaitingWorker) {
+    swWaitingWorker.postMessage({ type: 'SKIP_WAITING' });
+    swWaitingWorker = null;
+  }
+  document.getElementById('update-banner')?.classList.remove('show');
+  setTimeout(() => window.location.reload(), 300);
+}
+
 (function initPWA() {
   // Ícono canvas para Apple
   function makeIcon(size) {
@@ -2347,11 +2420,26 @@ window.onload = () => {
   const appleIcon = document.getElementById('apple-icon');
   if (appleIcon) appleIcon.href = makeIcon(180);
 
-  // Registrar sw.js externo (debe estar en la misma carpeta en GitHub)
+  // Registrar sw.js — con detección de nueva versión
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js')
-      .then(r => console.log('[PWA] SW registrado, scope:', r.scope))
-      .catch(e => console.warn('[PWA] SW falló:', e.message));
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      // Nueva versión encontrada mientras usas la app
+      reg.addEventListener('updatefound', () => {
+        const nw = reg.installing;
+        nw.addEventListener('statechange', () => {
+          if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+            swWaitingWorker = nw;
+            document.getElementById('update-banner')?.classList.add('show');
+          }
+        });
+      });
+      // Ya había una versión esperando al abrir
+      if (reg.waiting && navigator.serviceWorker.controller) {
+        swWaitingWorker = reg.waiting;
+        document.getElementById('update-banner')?.classList.add('show');
+      }
+      navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload());
+    }).catch(() => {});
   }
 
   // Prompt de instalación Android Chrome
