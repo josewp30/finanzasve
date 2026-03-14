@@ -851,6 +851,8 @@ function onAuthStateChange() {
       hideAuthScreen();
       if (!appInitialized) {
         appInitialized = true;
+        // Esperar un tick para que el DOM de main-app se renderice antes de escribir en él
+        await new Promise(r => setTimeout(r, 50));
         await initApp();
       }
     } else if (event === 'SIGNED_OUT' || (!session && event !== 'INITIAL_SESSION')) {
@@ -1129,8 +1131,10 @@ function setEl(id, v) { const e = document.getElementById(id); if (e) e.textCont
 //  HEADER
 // ═══════════════════════════════════════════════════════════
 function updateHdr() {
-  document.getElementById('hdr-rate').textContent = S.bcv > 0 ? `Bs. ${N(S.bcv)} / $` : '— Bs./$';
-  document.getElementById('hdr-dt').textContent = S.bcvDate ? ` · ${S.bcvDate}` : '';
+  const rate = document.getElementById('hdr-rate');
+  const dt   = document.getElementById('hdr-dt');
+  if (rate) rate.textContent = S.bcv > 0 ? `Bs. ${N(S.bcv)} / $` : '— Bs./$';
+  if (dt)   dt.textContent   = S.bcvDate ? ` · ${S.bcvDate}` : '';
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2280,23 +2284,26 @@ async function initApp() {
   try { const d = localStorage.getItem(LS_KEY_USER); if (d) S = { ...S, ...JSON.parse(d) }; } catch {}
 
   const hoy = new Date().toISOString().split('T')[0];
-  document.getElementById('g-f').value = hoy;
+  const setVal = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+
+  setVal('g-f', hoy);
   gTasaDiaActual = S.bcv || 0;
   if (S.bcv > 0) {
     setTasaBox('ok', S.bcv, hoy, '✓ Tasa activa (hoy)');
-    document.getElementById('g-btn-add').disabled = false;
+    const addBtn = document.getElementById('g-btn-add');
+    if (addBtn) addBtn.disabled = false;
   }
-  document.getElementById('inp-dt').value = hoy;
-  document.getElementById('m-dt').value = hoy;
-  document.getElementById('ht-fecha').value = hoy;
+  setVal('inp-dt', hoy);
+  setVal('m-dt', hoy);
+  setVal('ht-fecha', hoy);
   const mesActual = hoy.slice(0, 7);
-  document.getElementById('g-mes-filtro').value = mesActual;
+  setVal('g-mes-filtro', mesActual);
 
-  if (S.bcv)     { document.getElementById('inp-bcv').value = S.bcv; document.getElementById('inp-dt').value = S.bcvDate || hoy; }
-  if (S.salario) document.getElementById('inp-sal').value = S.salario;
-  if (S.b1)      document.getElementById('inp-b1').value  = S.b1;
-  if (S.b2)      document.getElementById('inp-b2').value  = S.b2;
-  if (S.cusd)    document.getElementById('inp-cu').value  = S.cusd;
+  if (S.bcv)     { setVal('inp-bcv', S.bcv); setVal('inp-dt', S.bcvDate || hoy); }
+  if (S.salario) setVal('inp-sal', S.salario);
+  if (S.b1)      setVal('inp-b1', S.b1);
+  if (S.b2)      setVal('inp-b2', S.b2);
+  if (S.cusd)    setVal('inp-cu', S.cusd);
 
   updateHdr(); liveCalc(); setCur('usd');
   S.tasaVista = S.bcv;
