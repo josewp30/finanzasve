@@ -1,5 +1,5 @@
 // FinanzasVE — Service Worker v1.1
-const CACHE = 'finanzasve-v1.3';
+const CACHE = 'finanzasve-v1.4';
 
 self.addEventListener('install', e => {
   // NO skipWaiting aquí — esperamos confirmación del usuario
