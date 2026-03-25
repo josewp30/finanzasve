@@ -30,6 +30,36 @@
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 html{font-size:15px;}
+
+  <script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').then(reg => {
+
+    // Detectar cuando hay un nuevo SW esperando activarse
+    reg.addEventListener('updatefound', () => {
+      const newWorker = reg.installing;
+
+      newWorker.addEventListener('statechange', () => {
+        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+          // Mostrar popup de actualización
+          document.getElementById("update-popup").style.display = "flex";
+        }
+      });
+    });
+
+    // Forzar actualización cuando el usuario presione el botón
+    window.updateApp = function () {
+      if (reg.waiting) {
+        reg.waiting.postMessage({ type: "SKIP_WAITING" });
+      }
+      window.location.reload();
+    };
+
+  });
+}
+</script>
+
+  
 body{font-family:'IBM Plex Sans',sans-serif;background:var(--navy);color:var(--text);min-height:100vh;}
 
 /* TOP BAR */
@@ -220,6 +250,32 @@ input::placeholder{color:var(--text2);font-family:'IBM Plex Sans',sans-serif;}
 }
 </style>
 </head>
+  <div id="update-popup" style="
+  display:none;
+  position:fixed;
+  bottom:20px;
+  left:50%;
+  transform:translateX(-50%);
+  background:#222;
+  color:white;
+  padding:15px 20px;
+  border-radius:10px;
+  box-shadow:0 4px 10px rgba(0,0,0,0.3);
+  z-index:9999;
+  font-family:Arial;
+  align-items:center;
+  gap:10px;
+">
+  <span>Hay una nueva versión disponible</span>
+  <button onclick="updateApp()" style="
+    background:#4CAF50;
+    color:white;
+    border:none;
+    padding:8px 12px;
+    border-radius:6px;
+    cursor:pointer;
+  ">Actualizar</button>
+  </div>
 <body>
 
 <!-- LOADING -->
