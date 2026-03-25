@@ -280,7 +280,6 @@ input::placeholder{color:var(--text2);font-family:'IBM Plex Sans',sans-serif;}
     <div class="nav-sec">Pagos</div>
     <button class="nav-btn" onclick="nav(this,'semanal')"><span class="ic">▦</span><span class="nav-lbl">Calendario</span></button>
     <div class="nav-sec">Análisis</div>
-    <button class="nav-btn" onclick="nav(this,'ingresos')"><span class="ic">↑</span><span class="nav-lbl">Ingresos</span></button>
     <button class="nav-btn" onclick="nav(this,'gastos')"><span class="ic">↓</span><span class="nav-lbl">Gastos</span></button>
     <button class="nav-btn" onclick="nav(this,'fijos')"><span class="ic">📌</span><span class="nav-lbl">Fijos</span></button>
     <button class="nav-btn" onclick="nav(this,'ahorro')"><span class="ic">◎</span><span class="nav-lbl">Ahorro</span></button>
@@ -396,96 +395,6 @@ input::placeholder{color:var(--text2);font-family:'IBM Plex Sans',sans-serif;}
       <div class="pg-title">Calendario de Pagos</div>
       <div class="pg-sub">Distribución semanal de ingresos. USD primario · Bs. referencia.</div>
       <div id="week-blocks"></div>
-    </div>
-
-    <!-- ═══════════════════════════════════════════════
-         INGRESOS LIBRES
-    ════════════════════════════════════════════════ -->
-    <div class="page" id="page-ingresos">
-      <div class="pg-title">Ingresos Libres</div>
-      <div class="pg-sub">Registra cualquier ingreso extra: freelance, negocio, inversión. <span style="color:var(--green);">USD primario</span> · Bs. anclado a tasa del día.</div>
-      <div class="g2">
-        <div class="card">
-          <div class="card-lbl">Nuevo Ingreso</div>
-          <div class="fld"><label>Descripción</label>
-            <input type="text" id="ing-desc" placeholder="Freelance, Venta, Dividendo...">
-          </div>
-          <div class="fld">
-            <label>Moneda</label>
-            <div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:.7rem;">
-              <button id="ing-cur-usd" onclick="setIngCur('usd')" style="flex:1;padding:.55rem;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;background:var(--green);color:#0b1120;transition:all .15s;">$ USD</button>
-              <button id="ing-cur-bs"  onclick="setIngCur('bs')"  style="flex:1;padding:.55rem;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;background:var(--navy3);color:var(--text2);transition:all .15s;">Bs.</button>
-            </div>
-            <div id="ing-inp-usd-wrap">
-              <div style="position:relative;">
-                <span style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--green);font-family:'IBM Plex Mono',monospace;font-size:.85rem;font-weight:600;">$</span>
-                <input type="number" id="ing-m-usd" placeholder="0.00" step="0.01" oninput="syncIngCurrency('usd')" style="padding-left:1.8rem;">
-              </div>
-              <div id="ing-conv-bs" style="margin-top:.4rem;font-size:.75rem;color:var(--text2);font-family:'IBM Plex Mono',monospace;">≈ — Bs. (tasa del día)</div>
-            </div>
-            <div id="ing-inp-bs-wrap" style="display:none;">
-              <div style="position:relative;">
-                <span style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--gold2);font-family:'IBM Plex Mono',monospace;font-size:.75rem;font-weight:600;">Bs.</span>
-                <input type="number" id="ing-m-bs" placeholder="0.00" step="0.01" oninput="syncIngCurrency('bs')" style="padding-left:2.5rem;">
-              </div>
-              <div id="ing-conv-usd" style="margin-top:.4rem;font-size:.75rem;color:var(--text2);font-family:'IBM Plex Mono',monospace;">≈ — USD</div>
-            </div>
-          </div>
-          <div class="g2" style="gap:.7rem;">
-            <div class="fld" style="margin:0;"><label>Fecha</label>
-              <input type="date" id="ing-f" onchange="onFechaIngresoChange()">
-            </div>
-            <div class="fld" style="margin:0;"><label>Categoría</label>
-              <select id="ing-c">
-                <option>Freelance</option><option>Negocio</option><option>Inversión</option>
-                <option>Venta</option><option>Comisión</option><option>Bono extra</option><option>Otro</option>
-              </select>
-            </div>
-          </div>
-          <!-- Tasa del día -->
-          <div id="ing-tasa-box" style="margin-top:.7rem;border-radius:8px;padding:.6rem .85rem;display:none;">
-            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem;">
-              <div>
-                <div id="ing-tasa-lbl" style="font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin-bottom:.2rem;"></div>
-                <div id="ing-tasa-val" style="font-family:'IBM Plex Mono',monospace;font-size:.9rem;font-weight:500;"></div>
-              </div>
-              <div id="ing-tasa-manual-wrap" style="display:none;">
-                <div style="display:flex;gap:.4rem;align-items:center;">
-                  <input type="number" id="ing-tasa-manual" placeholder="Bs./USD" step="0.01"
-                    style="width:110px;padding:.4rem .6rem;font-size:.8rem;" oninput="onIngTasaManualInput()">
-                  <button class="btn btn-t btn-sm" onclick="guardarTasaManualIngreso()">Guardar</button>
-                </div>
-              </div>
-            </div>
-          </div>
-          <button class="btn btn-p" id="ing-btn-add" onclick="addIngreso()" style="width:100%;justify-content:center;margin-top:.8rem;background:var(--green);border-color:var(--green);color:#0b1120;" disabled>+ Agregar Ingreso</button>
-        </div>
-
-        <div class="card">
-          <div class="card-lbl">Resumen del Mes</div>
-          <div id="ing-sem" style="display:flex;flex-direction:column;gap:.5rem;"></div>
-          <div class="hr"></div>
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <span class="muted small">Total ingresos libres</span>
-            <div style="text-align:right;">
-              <div class="mono" style="font-size:1.1rem;color:var(--green);" id="ing-tot-usd">— USD</div>
-              <div class="mono gold xs" id="ing-tot-bs">— Bs.</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-lbl" style="display:flex;justify-content:space-between;align-items:center;">
-          Historial de Ingresos
-          <div style="display:flex;gap:.5rem;">
-            <input type="month" id="ing-mes-filtro" style="max-width:160px;" onchange="renderIngresos()">
-            <button class="btn btn-d btn-sm" onclick="clearIngresos()">Borrar todo</button>
-          </div>
-        </div>
-        <div id="ing-list"></div>
-        <div id="ing-empty" class="muted small" style="text-align:center;padding:1.5rem;">Sin ingresos registrados.</div>
-      </div>
     </div>
 
     <!-- ═══════════════════════════════════════════════
@@ -1031,12 +940,11 @@ function toggleAuthMode() {
 let S = {
   bcv: 0, bcvDate: '',
   salario: 0, b1: 0, b2: 0, cusd: 0,
-  gastos: [],
-  gastosFijos: [],
-  tasasHistoricas: [],
-  salarios: [],
-  tasaVista: 0,
-  ingresos: [],       // ingresos libres (freelance, negocio, etc.)
+  gastos: [],         // caché del mes actual
+  gastosFijos: [],    // caché
+  tasasHistoricas: [], // caché
+  salarios: [],       // caché historial
+  tasaVista: 0,       // tasa seleccionada para vista histórica
 };
 let CH = {};
 const LS_KEY = 'fve4';
@@ -1145,19 +1053,6 @@ async function apiGet(accion, params = {}) {
     if (!r.ok) throw new Error('getGastos: ' + r.status);
     return { status: 'ok', data: await r.json() };
   }
-  if (accion === 'getIngresos') {
-    const hdrs = await getHdrs();
-    const url = new URL(`${SB_URL}/rest/v1/ingresos`);
-    url.searchParams.set('select', '*');
-    url.searchParams.set('order', 'fecha.desc');
-    if (params.mes) {
-      url.searchParams.set('fecha', `gte.${params.mes}-01`);
-      url.searchParams.append('fecha', `lte.${params.mes}-31`);
-    }
-    const r = await fetch(url.toString(), { headers: hdrs, signal: AbortSignal.timeout(20000) });
-    if (!r.ok) throw new Error('getIngresos: ' + r.status);
-    return { status: 'ok', data: await r.json() };
-  }
   throw new Error('apiGet acción desconocida: ' + accion);
 }
 
@@ -1217,20 +1112,6 @@ async function apiPost(accion, body = {}) {
       'clave'
     );
     return { status: 'ok', data: { saved: true } };
-  }
-  if (accion === 'saveIngreso') {
-    const row = await sbInsert('ingresos', {
-      fecha: body.fecha, descripcion: body.descripcion,
-      categoria: body.categoria || 'Otro',
-      monto_usd: +body.monto_usd, tasa_dia: +body.tasa_dia,
-      monto_bs_dia: +body.monto_bs_dia,
-      user_id: uid,
-    });
-    return { status: 'ok', data: { saved: true, id: row.id } };
-  }
-  if (accion === 'deleteIngreso') {
-    await sbDelete('ingresos', body.id);
-    return { status: 'ok', data: { deleted: true, id: body.id } };
   }
   throw new Error('apiPost acción desconocida: ' + accion);
 }
@@ -1478,16 +1359,10 @@ function aplicarTasaHistorica() {
 function renderResumen() {
   const tasa = S.tasaVista > 0 ? S.tasaVista : S.bcv;
   const { salario: sal, b1, b2, cusd: cu } = S;
-  const cbs = cu * S.bcv, ay = cbs * .65;
+  const cbs = cu * S.bcv, ay = cbs * .65; // Bs. siempre en tasa activa
+  // USD: usamos la tasa seleccionada para mostrar equivalencia
   const toUSD = bs => usdFromBs(bs, tasa);
   const total = sal + b1 + b2 + cbs + ay;
-
-  // Ingresos libres del mes actual
-  const mes = new Date().toISOString().slice(0,7);
-  const ingLibresUSD = S.ingresos
-    .filter(x => String(x.fecha||'').startsWith(mes))
-    .reduce((s,x) => s + (x.monto_usd||0), 0);
-  const totalConIng = toUSD(total) + ingLibresUSD;
 
   const kpis = [
     { lbl: 'Bono 1', usd: toUSD(b1), bs: b1, ac: 'var(--gold)' },
@@ -1495,8 +1370,7 @@ function renderResumen() {
     { lbl: 'Salario', usd: toUSD(sal), bs: sal, ac: 'var(--blue)' },
     { lbl: 'Cesta Ticket', usd: toUSD(cbs), bs: cbs, ac: 'var(--teal)' },
     { lbl: 'Ayuda 65%', usd: toUSD(ay), bs: ay, ac: 'var(--teal)' },
-    ...(ingLibresUSD > 0 ? [{ lbl: 'Ingresos Libres', usd: ingLibresUSD, bs: ingLibresUSD * S.bcv, ac: 'var(--green)' }] : []),
-    { lbl: ingLibresUSD > 0 ? 'TOTAL GENERAL' : 'TOTAL MENSUAL', usd: totalConIng, bs: totalConIng * S.bcv, ac: 'var(--green)', big: true },
+    { lbl: 'TOTAL MENSUAL', usd: toUSD(total), bs: total, ac: 'var(--green)', big: true },
   ];
 
   document.getElementById('kpi-grid').innerHTML = kpis.map(k => `
@@ -1817,234 +1691,6 @@ async function cargarGastosMes() {
   renderGastos(); renderAhorro();
 }
 
-// ═══════════════════════════════════════════════════════════
-//  INGRESOS LIBRES
-// ═══════════════════════════════════════════════════════════
-let ingTasaDiaActual = 0;
-
-function setIngCur(cur) {
-  const usdW = document.getElementById('ing-inp-usd-wrap');
-  const bsW  = document.getElementById('ing-inp-bs-wrap');
-  const btnU = document.getElementById('ing-cur-usd');
-  const btnB = document.getElementById('ing-cur-bs');
-  if (cur === 'usd') {
-    usdW.style.display = ''; bsW.style.display = 'none';
-    btnU.style.background = 'var(--green)'; btnU.style.color = '#0b1120';
-    btnB.style.background = 'var(--navy3)'; btnB.style.color = 'var(--text2)';
-  } else {
-    usdW.style.display = 'none'; bsW.style.display = '';
-    btnB.style.background = 'var(--gold)'; btnB.style.color = '#0b1120';
-    btnU.style.background = 'var(--navy3)'; btnU.style.color = 'var(--text2)';
-  }
-}
-
-function syncIngCurrency(from) {
-  const usd = parseFloat(document.getElementById('ing-m-usd').value) || 0;
-  const bs  = parseFloat(document.getElementById('ing-m-bs').value) || 0;
-  const t   = ingTasaDiaActual || S.bcv || 0;
-  if (from === 'usd') {
-    document.getElementById('ing-conv-bs').textContent = t > 0 ? `≈ Bs. ${(usd*t).toLocaleString('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2})} (tasa ${t.toFixed(2)})` : '≈ — Bs.';
-  } else {
-    document.getElementById('ing-conv-usd').textContent = t > 0 ? `≈ $ ${(bs/t).toLocaleString('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2})}` : '≈ — USD';
-  }
-}
-
-function setIngTasaBox(estado, tasa, fecha, msg) {
-  const box  = document.getElementById('ing-tasa-box');
-  const lbl  = document.getElementById('ing-tasa-lbl');
-  const val  = document.getElementById('ing-tasa-val');
-  const manW = document.getElementById('ing-tasa-manual-wrap');
-  const btn  = document.getElementById('ing-btn-add');
-  if (!box) return;
-  const estilos = {
-    ok:     'background:rgba(68,201,126,.08);border:1px solid rgba(68,201,126,.2);',
-    api:    'background:rgba(41,184,176,.08);border:1px solid rgba(41,184,176,.2);',
-    manual: 'background:rgba(200,168,75,.08);border:1px solid rgba(200,168,75,.2);',
-    error:  'background:rgba(224,92,92,.08);border:1px solid rgba(224,92,92,.2);',
-    loading:'background:rgba(41,184,176,.04);border:1px solid rgba(41,184,176,.1);',
-  };
-  box.style.cssText = estilos[estado] || estilos.ok;
-  box.style.display = 'block';
-  lbl.textContent = msg || '';
-  lbl.style.color = estado==='ok'||estado==='api' ? 'var(--green)' : estado==='manual' ? 'var(--gold2)' : estado==='error' ? 'var(--red)' : 'var(--teal)';
-  val.textContent = tasa > 0 ? `Bs. ${tasa.toFixed(4)} / USD` : '';
-  val.style.color = 'var(--text)';
-  manW.style.display = estado === 'error' ? '' : 'none';
-  ingTasaDiaActual = tasa || 0;
-  if (btn) btn.disabled = !(tasa > 0);
-}
-
-async function onFechaIngresoChange() {
-  const fecha = document.getElementById('ing-f').value;
-  if (!fecha) return;
-  const hoy = new Date().toISOString().split('T')[0];
-  if (fecha > hoy) { setIngTasaBox('error', 0, fecha, '✗ Fecha futura no válida'); return; }
-  // 1. Buscar en caché local
-  const cached = S.tasasHistoricas.find(t => t.fecha === fecha);
-  if (cached) { setIngTasaBox('ok', cached.tasa, fecha, `✓ Tasa del ${fecha} (caché)`); return; }
-  // 2. Si es hoy y hay tasa activa
-  if (fecha === hoy && S.bcv > 0) { setIngTasaBox('ok', S.bcv, fecha, '✓ Tasa BCV activa (hoy)'); return; }
-  // 3. Buscar en API histórica
-  setIngTasaBox('loading', 0, fecha, '⟳ Buscando tasa histórica...');
-  try {
-    const r = await fetch('https://ve.dolarapi.com/v1/historicos/dolares/oficial', { signal: AbortSignal.timeout(10000) });
-    const arr = await r.json();
-    const entry = arr.find(x => x.fecha && x.fecha.startsWith(fecha));
-    if (entry) {
-      const tasa = parseFloat(entry.promedio || entry.venta) || 0;
-      setIngTasaBox('api', tasa, fecha, `✓ Tasa histórica ${fecha}`);
-      if (tasa > 0) {
-        S.tasasHistoricas.push({ fecha, tasa, fuente: 'BCV Histórico' });
-        try { await apiPost('saveTasa', { fecha, tasa, fuente: 'BCV Histórico' }); } catch {}
-      }
-    } else {
-      setIngTasaBox('error', 0, fecha, '✗ Tasa no encontrada. Ingrésala manualmente.');
-    }
-  } catch {
-    setIngTasaBox('error', 0, fecha, '✗ Sin conexión. Ingrésala manualmente.');
-  }
-}
-
-function onIngTasaManualInput() {
-  const t = parseFloat(document.getElementById('ing-tasa-manual').value) || 0;
-  if (t > 0) ingTasaDiaActual = t;
-}
-
-async function guardarTasaManualIngreso() {
-  const t = parseFloat(document.getElementById('ing-tasa-manual').value) || 0;
-  const f = document.getElementById('ing-f').value;
-  if (!t || !f) return;
-  setIngTasaBox('manual', t, f, '✓ Tasa manual confirmada');
-  try { await apiPost('saveTasa', { fecha: f, tasa: t, fuente: 'Manual' }); } catch {}
-}
-
-async function addIngreso() {
-  const desc = (document.getElementById('ing-desc').value || '').trim();
-  const fecha = document.getElementById('ing-f').value;
-  const cat  = document.getElementById('ing-c').value;
-  const isBs = document.getElementById('ing-inp-bs-wrap').style.display !== 'none';
-  const tasa = ingTasaDiaActual || S.bcv || 0;
-  let monto_usd, monto_bs;
-  if (isBs) {
-    monto_bs  = parseFloat(document.getElementById('ing-m-bs').value) || 0;
-    monto_usd = tasa > 0 ? monto_bs / tasa : 0;
-  } else {
-    monto_usd = parseFloat(document.getElementById('ing-m-usd').value) || 0;
-    monto_bs  = monto_usd * tasa;
-  }
-  if (!desc)      { alert('Escribe una descripción.'); return; }
-  if (!fecha)     { alert('Selecciona una fecha.'); return; }
-  if (!monto_usd) { alert('Ingresa un monto mayor a 0.'); return; }
-
-  const btn = document.getElementById('ing-btn-add');
-  btn.disabled = true; btn.textContent = '⟳ Guardando...';
-  const tmpId = 'ing_' + Date.now();
-  const item = { id: tmpId, fecha, descripcion: desc, categoria: cat,
-    monto_usd, tasa_dia: tasa, monto_bs_dia: monto_bs };
-  S.ingresos.push(item);
-  renderIngresos(); renderResumen(); renderAhorro();
-  try {
-    const res = await apiPost('saveIngreso', { ...item });
-    if (res.status === 'ok') {
-      const real = S.ingresos.find(x => x.id === tmpId);
-      if (real) real.id = res.data.id;
-    }
-  } catch(e) { console.warn('saveIngreso error:', e); }
-  // Limpiar form
-  document.getElementById('ing-desc').value = '';
-  document.getElementById('ing-m-usd').value = '';
-  document.getElementById('ing-m-bs').value = '';
-  document.getElementById('ing-conv-bs').textContent = '≈ — Bs. (tasa del día)';
-  btn.textContent = '+ Agregar Ingreso';
-  setIngTasaBox('ok', ingTasaDiaActual, fecha, '✓ Listo');
-}
-
-async function delIngreso(id) {
-  if (!confirm('¿Eliminar este ingreso?')) return;
-  S.ingresos = S.ingresos.filter(x => x.id !== id);
-  renderIngresos(); renderResumen(); renderAhorro();
-  try { await apiPost('deleteIngreso', { id }); } catch(e) { console.warn(e); }
-}
-
-async function clearIngresos() {
-  const mes = (document.getElementById('ing-mes-filtro') || {}).value || '';
-  const targets = mes ? S.ingresos.filter(x => String(x.fecha||'').startsWith(mes)) : [...S.ingresos];
-  if (!targets.length) return;
-  if (!confirm(`¿Borrar ${targets.length} ingreso(s)?`)) return;
-  for (const t of targets) {
-    S.ingresos = S.ingresos.filter(x => x.id !== t.id);
-    try { await apiPost('deleteIngreso', { id: t.id }); } catch {}
-  }
-  renderIngresos(); renderResumen(); renderAhorro();
-}
-
-function renderIngresos() {
-  const mes = (document.getElementById('ing-mes-filtro') || {}).value || '';
-  const lista = mes
-    ? S.ingresos.filter(x => String(x.fecha||'').startsWith(mes))
-    : S.ingresos;
-  const sorted = [...lista].sort((a,b) => (b.fecha||'').localeCompare(a.fecha||''));
-  const empty = document.getElementById('ing-empty');
-  const list  = document.getElementById('ing-list');
-  const totUSD = document.getElementById('ing-tot-usd');
-  const totBS  = document.getElementById('ing-tot-bs');
-  const ingSem = document.getElementById('ing-sem');
-  if (!list) return;
-
-  const totalUSD = lista.reduce((s,x) => s + (x.monto_usd||0), 0);
-  const totalBS  = lista.reduce((s,x) => s + (x.monto_bs_dia||0), 0);
-  if (totUSD) totUSD.textContent = `$ ${totalUSD.toLocaleString('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-  if (totBS)  totBS.textContent  = `Bs. ${totalBS.toLocaleString('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-
-  // Resumen por semana
-  if (ingSem) {
-    const sems = {};
-    lista.forEach(x => {
-      const d = new Date(x.fecha + 'T12:00:00');
-      const wk = `Sem ${Math.ceil(d.getDate()/7)}`;
-      if (!sems[wk]) sems[wk] = 0;
-      sems[wk] += x.monto_usd || 0;
-    });
-    ingSem.innerHTML = Object.entries(sems).map(([s,v]) =>
-      `<div style="display:flex;justify-content:space-between;font-size:.82rem;">
-        <span class="muted">${s}</span>
-        <span class="mono" style="color:var(--green);">$ ${v.toLocaleString('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
-      </div>`
-    ).join('') || '<span class="muted small">Sin datos</span>';
-  }
-
-  if (!sorted.length) {
-    if (empty) empty.style.display = '';
-    list.innerHTML = '';
-    return;
-  }
-  if (empty) empty.style.display = 'none';
-  list.innerHTML = sorted.map(x => `
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:.75rem 0;border-bottom:1px solid var(--border);">
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:.85rem;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${x.descripcion}</div>
-        <div style="font-size:.72rem;color:var(--text2);margin-top:.15rem;">
-          <span style="background:rgba(68,201,126,.1);color:var(--green);border-radius:4px;padding:.1rem .4rem;font-size:.65rem;font-weight:600;">${x.categoria||'Otro'}</span>
-          <span style="margin-left:.4rem;">${x.fecha||''}</span>
-          <span style="margin-left:.4rem;opacity:.6;">Bs.${(x.tasa_dia||0).toFixed(2)}/$</span>
-        </div>
-      </div>
-      <div style="text-align:right;flex-shrink:0;margin-left:.8rem;">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:.95rem;font-weight:600;color:var(--green);">$ ${(x.monto_usd||0).toLocaleString('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
-        <div style="font-size:.7rem;color:var(--text2);opacity:.6;">Bs. ${(x.monto_bs_dia||0).toLocaleString('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
-      </div>
-      <button onclick="delIngreso('${x.id}')" style="margin-left:.5rem;background:none;border:none;color:var(--red);cursor:pointer;font-size:1rem;padding:.2rem .4rem;flex-shrink:0;" title="Eliminar">✕</button>
-    </div>`).join('');
-}
-
-function totalIngresosLibresUSD() {
-  // Suma del mes actual visible
-  const mes = new Date().toISOString().slice(0,7);
-  return S.ingresos
-    .filter(x => String(x.fecha||'').startsWith(mes))
-    .reduce((s,x) => s + (x.monto_usd||0), 0);
-}
-
 function renderGastos() {
   // Filtrar por el mes seleccionado en el selector — todos los datos están en memoria
   const mesFiltro = (document.getElementById('g-mes-filtro') || {}).value || '';
@@ -2199,27 +1845,18 @@ function renderAhorro() {
   const cbs = cu * bcv, ay = cbs * .65, totalBs = sal + b1 + b2 + cbs + ay;
   const totalUSD = usdFromBs(totalBs, bcv);
 
-  // Ingresos libres del mes actual
-  const mes = new Date().toISOString().slice(0,7);
-  const ingLibresUSD = S.ingresos
-    .filter(x => String(x.fecha||'').startsWith(mes))
-    .reduce((s,x) => s + (x.monto_usd||0), 0);
-  const totalIngresoUSD = totalUSD + ingLibresUSD;
-  const totalIngresoBs  = totalBs  + ingLibresUSD * bcv;
-
   const totGasUSD = S.gastos.reduce((a, g) => a + (parseFloat(g.monto_usd) || 0), 0);
   const totGasBsDia = S.gastos.reduce((a, g) => a + (parseFloat(g.monto_bs_dia) || 0), 0);
   const fijosFijos = S.gastosFijos.filter(g => g.activo !== false && g.activo !== 'FALSE');
   const totFijosUSD = fijosFijos.reduce((a, g) => a + (parseFloat(g.monto_usd) || 0), 0);
   const totalGastosUSD = totGasUSD + totFijosUSD;
 
-  const saldoUSD = totalIngresoUSD - totalGastosUSD;
-  const saldoBs  = totalIngresoBs  - (totGasBsDia + bsFromUSD(totFijosUSD, bcv));
-  const metaUSD  = totalIngresoUSD * .4;
-  const metaBs   = totalIngresoBs  * .4;
-  const pct = totalIngresoUSD > 0 ? Math.min((Math.max(saldoUSD, 0) / totalIngresoUSD) * 100, 100) : 0;
+  const saldoUSD = totalUSD - totalGastosUSD;
+  const saldoBs = totalBs - (totGasBsDia + bsFromUSD(totFijosUSD, bcv));
+  const metaUSD = totalUSD * .4, metaBs = totalBs * .4;
+  const pct = totalUSD > 0 ? Math.min((Math.max(saldoUSD, 0) / totalUSD) * 100, 100) : 0;
 
-  setEl('a-iusd', fUSD(totalIngresoUSD)); setEl('a-ibs', fBs(totalIngresoBs));
+  setEl('a-iusd', fUSD(totalUSD)); setEl('a-ibs', fBs(totalBs));
   setEl('a-gusd', fUSD(totalGastosUSD)); setEl('a-gbs', fBs(totGasBsDia + bsFromUSD(totFijosUSD, bcv)));
   setEl('a-susd', fUSD(saldoUSD)); setEl('a-sbs', fBs(saldoBs));
   setEl('a-meta-usd', fUSD(metaUSD)); setEl('a-meta-bs', fBs(metaBs));
@@ -2227,14 +1864,13 @@ function renderAhorro() {
   document.getElementById('a-bar').style.width = pct + '%';
   setEl('a-pct', pct.toFixed(1) + '%');
 
-  const pctG = totalIngresoUSD > 0 ? (totalGastosUSD / totalIngresoUSD) * 100 : 0;
+  const pctG = totalUSD > 0 ? (totalGastosUSD / totalUSD) * 100 : 0;
   let adv;
-  if (!totalIngresoUSD) adv = 'Configura tus ingresos para ver el análisis.';
+  if (!totalUSD) adv = 'Configura tus ingresos para ver el análisis.';
   else if (pct >= 40) adv = `✅ Excelente — ahorras ${pct.toFixed(1)}%. Saldo: ${fUSD(Math.max(saldoUSD, 0))}`;
   else if (pct >= 20) adv = `⚠ Ahorras ${pct.toFixed(1)}%. Para llegar al 40% reduce gastos en ${fUSD(metaUSD - Math.max(saldoUSD, 0))}.`;
   else adv = `🔴 Ahorro ${pct.toFixed(1)}%. Gastos = ${pctG.toFixed(1)}% del ingreso. Meta 40% = ${fUSD(metaUSD)}.`;
-  if (ingLibresUSD > 0) adv += ` · Ingresos extra: ${fUSD(ingLibresUSD)}`;
-  if (totFijosUSD > 0)  adv += ` · Gastos fijos: ${fUSD(totFijosUSD)}/mes`;
+  if (totFijosUSD > 0) adv += ` · Gastos fijos: ${fUSD(totFijosUSD)}/mes`;
   setEl('a-adv', adv);
 
   // Chart data — USD INMUTABLE desde monto_usd guardado, nunca recalculado
@@ -2710,17 +2346,6 @@ async function initApp() {
       S.gastos_mes_visible = mesActual;
     }
 
-    // Cargar ingresos libres
-    const resIng = await apiGet('getIngresos');
-    if (resIng.status === 'ok' && Array.isArray(resIng.data)) {
-      S.ingresos = resIng.data.map(x => ({
-        ...x, id: String(x.id||''),
-        monto_usd:    parseFloat(x.monto_usd)||0,
-        tasa_dia:     parseFloat(x.tasa_dia)||S.bcv,
-        monto_bs_dia: parseFloat(x.monto_bs_dia)||0,
-      }));
-    }
-
     const resSal = await apiGet('getSalarios');
     if (resSal.status === 'ok' && resSal.data) {
       S.salarios = resSal.data.sort((a,b) => String(b.fecha||'').localeCompare(String(a.fecha||'')));
@@ -2731,28 +2356,22 @@ async function initApp() {
         S.b2  = parseFloat(ult.bono2_bs)||0;
         S.cusd = parseFloat(ult.cesta_usd)||0;
         S.bcv = parseFloat(ult.tasa_dia)||S.bcv;
-        setVal('inp-sal', S.salario);
-        setVal('inp-b1',  S.b1);
-        setVal('inp-b2',  S.b2);
-        setVal('inp-cu',  S.cusd);
-        setVal('inp-bcv', S.bcv);
+        document.getElementById('inp-sal').value = S.salario;
+        document.getElementById('inp-b1').value  = S.b1;
+        document.getElementById('inp-b2').value  = S.b2;
+        document.getElementById('inp-cu').value  = S.cusd;
+        document.getElementById('inp-bcv').value = S.bcv;
       }
     }
 
-    // Inicializar fecha y filtro mes en ingresos
-    const ingF = document.getElementById('ing-f');
-    const ingMes = document.getElementById('ing-mes-filtro');
-    if (ingF) ingF.value = hoy;
-    if (ingMes) ingMes.value = mesActual;
-
     try { localStorage.setItem('fve4_' + (currentUser?.id||'anon'), JSON.stringify(S)); } catch {}
     updateHdr(); liveCalc(); poblarSelectorTasas();
-    renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos(); renderIngresos();
+    renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos();
     setSyncState('ok');
 
   } catch (err) {
     setSyncState('err', 'Sin conexión');
-    if (S.bcv && S.salario) { renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos(); renderIngresos(); }
+    if (S.bcv && S.salario) { renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos(); }
   }
   hideLoading();
 
