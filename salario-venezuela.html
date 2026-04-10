@@ -1067,12 +1067,19 @@ function setSyncState(state, msg) {
 }
 
 // Siempre obtiene el token fresco de la sesión activa
+let cachedToken = null;
+let tokenExpiry = 0;
+
 async function getHdrs(extra = {}) {
-  const { data } = await sb.auth.getSession();
-  const token = data?.session?.access_token || SB_KEY;
+  const now = Date.now();
+  if (!cachedToken || now > tokenExpiry) {
+    const { data } = await sb.auth.getSession();
+    cachedToken = data?.session?.access_token || SB_KEY;
+    tokenExpiry = now + 300000; // Cache por 5 min
+  }
   return {
     'apikey': SB_KEY,
-    'Authorization': 'Bearer ' + token,
+    'Authorization': 'Bearer ' + cachedToken,
     'Content-Type': 'application/json',
     'Prefer': 'return=representation',
     ...extra,
@@ -1696,39 +1703,37 @@ async function addGasto() {
     monto_usd: montoUSD, tasa_dia: tasaDia, monto_bs_dia: montoBsDia, tipo: 'variable',
   };
 
-  S.gastos.push(gasto); lsSave();
-  // Limpiar form
+  S.gastos.push(gasto);
+  lsSave();
+
+  // Limpiar form y refrescar UI local inmediato
   document.getElementById('g-desc').value = '';
   document.getElementById('g-m-usd').value = '';
   document.getElementById('g-m-bs').value = '';
   document.getElementById('g-conv-bs').textContent = '≈ — Bs. (tasa del día)';
   document.getElementById('g-conv-usd').textContent = '≈ — USD';
-  renderGastos(); renderAhorro();
 
-  setSyncState('loading', 'Guardando...');
-  showGastoSyncStatus('loading', '⟳ Guardando en Sheets...');
-  try {
-    const res = await apiPost('saveGasto', {
-      fecha, descripcion: desc, categoria: cat,
-      monto_usd: montoUSD, tasa_dia: tasaDia, monto_bs_dia: montoBsDia, tipo: 'variable',
-    });
-    // Mostrar respuesta exacta de Sheets para debug
+  renderGastos();
+  // No renderizamos todo lo demás a menos que sea necesario o en el próximo tick
+  setTimeout(() => renderAhorro(), 10);
+
+  setSyncState('loading', 'Sincronizando...');
+
+  // Guardado en segundo plano (No bloqueante)
+  apiPost('saveGasto', {
+    fecha, descripcion: desc, categoria: cat,
+    monto_usd: montoUSD, tasa_dia: tasaDia, monto_bs_dia: montoBsDia, tipo: 'variable',
+  }).then(res => {
     if (res && res.status === 'ok' && res.data && res.data.id) {
       const idxLocal = S.gastos.findIndex(g => g.id === gasto.id);
       if (idxLocal >= 0) S.gastos[idxLocal].id = res.data.id;
       lsSave();
       setSyncState('ok');
-      showGastoSyncStatus('ok', `✓ Guardado en Sheets · ID: ${res.data.id}`);
-    } else {
-      // Respuesta inesperada — mostrarla completa
-      const detalle = JSON.stringify(res || {});
-      setSyncState('err', 'Respuesta inesperada');
-      showGastoSyncStatus('error', `⚠ Respuesta Sheets: ${detalle}`);
     }
-  } catch(err) {
-    setSyncState('err', 'Error de conexión');
-    showGastoSyncStatus('error', `❌ Error: ${err.message || String(err)}`);
-  }
+  }).catch(err => {
+    console.error("Fallo sincro gasto:", err);
+    setSyncState('err', 'Pendiente de subir');
+  });
 }
 
 function showGastoSyncStatus(type, msg) {
