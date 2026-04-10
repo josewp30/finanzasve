@@ -2157,17 +2157,22 @@ async function cargarTasasHistoricas() {
   showLoading('Cargando historial de tasas...');
   try {
     const res = await apiGet('getTasas');
-    if (res.status === 'ok' && res.data) {
+    if (res && res.status === 'ok' && Array.isArray(res.data)) {
       S.tasasHistoricas = res.data
         .map(t => ({ fecha: String(t.fecha || ''), tasa: parseFloat(t.tasa) || 0, fuente: t.fuente || 'BCV' }))
         .filter(t => t.fecha && t.tasa > 0)
         .sort((a, b) => b.fecha.localeCompare(a.fecha));
-      lsSave(); setSyncState('ok');
+      lsSave();
+      setSyncState('ok');
       poblarSelectorTasas();
+      renderTasasList();
     }
-  } catch { setSyncState('err', 'Sin conexión'); }
-  renderTasasList();
-  hideLoading();
+  } catch(e) {
+    console.error("Error cargando tasas:", e);
+    setSyncState('err', 'Error al sincronizar');
+  } finally {
+    hideLoading();
+  }
 }
 
 function renderTasasList() {
@@ -2255,13 +2260,18 @@ async function cargarHistorialSalarios() {
   showLoading('Cargando historial de salarios...');
   try {
     const res = await apiGet('getSalarios');
-    if (res.status === 'ok' && res.data) {
+    if (res && res.status === 'ok' && Array.isArray(res.data)) {
       S.salarios = res.data.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
-      lsSave(); setSyncState('ok');
+      lsSave();
+      setSyncState('ok');
+      renderHistorialSalarios();
     }
-  } catch { setSyncState('err', 'Sin conexión'); }
-  renderHistorialSalarios();
-  hideLoading();
+  } catch(e) {
+    console.error("Error cargando salarios:", e);
+    setSyncState('err', 'Error al sincronizar');
+  } finally {
+    hideLoading();
+  }
 }
 
 function renderHistorialSalarios() {
