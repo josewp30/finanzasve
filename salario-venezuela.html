@@ -950,8 +950,11 @@ let CH = {};
 const LS_KEY = 'fve4';
 
 const lsLoad = () => { try { const d = localStorage.getItem(LS_KEY); if (d) S = { ...S, ...JSON.parse(d) }; } catch {} };
-const lsSave = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch {} };
-const lsSaveUser = () => { try { localStorage.setItem('fve4_' + (currentUser?.id||'anon'), JSON.stringify(S)); } catch {} };
+const lsSave = () => {
+  const key = currentUser ? 'fve4_' + currentUser.id : LS_KEY;
+  try { localStorage.setItem(key, JSON.stringify(S)); } catch {}
+};
+const lsSaveUser = lsSave;
 
 // ═══════════════════════════════════════════════════════════
 //  SUPABASE API LAYER
@@ -2262,7 +2265,6 @@ function hideLoading() { document.getElementById('loading-overlay').classList.re
 // ═══════════════════════════════════════════════════════════
 // initApp — llamado por onAuthStateChange cuando el usuario está logueado
 async function initApp() {
-  // Mostrar email/avatar del usuario
   if (currentUser) {
     const email     = currentUser.email || '';
     const name      = currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || '';
@@ -2281,7 +2283,19 @@ async function initApp() {
   // Resetear estado al cambiar de usuario
   S = { bcv:0, bcvDate:'', salario:0, b1:0, b2:0, cusd:0, gastos:[], gastosFijos:[], tasasHistoricas:[], salarios:[], tasaVista:0 };
   const LS_KEY_USER = 'fve4_' + (currentUser?.id || 'anon');
-  try { const d = localStorage.getItem(LS_KEY_USER); if (d) S = { ...S, ...JSON.parse(d) }; } catch {}
+  try {
+    const d = localStorage.getItem(LS_KEY_USER);
+    if (d) {
+      const parsed = JSON.parse(d);
+      if (parsed && typeof parsed === 'object') S = { ...S, ...parsed };
+    }
+  } catch(e) { console.error("Error loading localStorage:", e); }
+
+  // Sanitización para evitar crashes si localStorage tiene datos corruptos
+  if (!Array.isArray(S.gastos)) S.gastos = [];
+  if (!Array.isArray(S.gastosFijos)) S.gastosFijos = [];
+  if (!Array.isArray(S.tasasHistoricas)) S.tasasHistoricas = [];
+  if (!Array.isArray(S.salarios)) S.salarios = [];
 
   const hoy = new Date().toISOString().split('T')[0];
   const setVal = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
@@ -2307,14 +2321,14 @@ async function initApp() {
 
   updateHdr(); liveCalc(); setCur('usd');
   S.tasaVista = S.bcv;
-  if (S.bcv && S.salario) { renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos(); }
 
   // Sincronizar con Supabase
   setSyncState('loading', 'Conectando...');
   showLoading('Cargando tu data...');
+
   try {
     const resTasas = await apiGet('getTasas');
-    if (resTasas.status === 'ok' && resTasas.data) {
+    if (resTasas.status === 'ok' && Array.isArray(resTasas.data)) {
       S.tasasHistoricas = resTasas.data
         .map(t => ({ fecha: String(t.fecha||''), tasa: parseFloat(t.tasa)||0, fuente: t.fuente||'BCV' }))
         .filter(t => t.fecha && t.tasa > 0)
@@ -2322,7 +2336,7 @@ async function initApp() {
     }
 
     const resFijos = await apiGet('getGastosFijos');
-    if (resFijos.status === 'ok' && resFijos.data) {
+    if (resFijos.status === 'ok' && Array.isArray(resFijos.data)) {
       S.gastosFijos = resFijos.data.map(g => ({ ...g, monto_usd: parseFloat(g.monto_usd)||0, activo: g.activo === true || g.activo === 'TRUE' }));
     }
 
@@ -2341,13 +2355,12 @@ async function initApp() {
         monto_bs_dia: parseFloat(g.monto_bs_dia)||0,
       }));
       const idsSB = new Set(deSB.map(g => g.id));
-      const pendientes = S.gastos.filter(g => String(g.id||'').startsWith('gto_') && !idsSB.has(String(g.id)));
+      const pendientes = S.gastos.filter(g => g && String(g.id||'').startsWith('gto_') && !idsSB.has(String(g.id)));
       S.gastos = [...deSB, ...pendientes];
-      S.gastos_mes_visible = mesActual;
     }
 
     const resSal = await apiGet('getSalarios');
-    if (resSal.status === 'ok' && resSal.data) {
+    if (resSal.status === 'ok' && Array.isArray(resSal.data)) {
       S.salarios = resSal.data.sort((a,b) => String(b.fecha||'').localeCompare(String(a.fecha||'')));
       if (!S.salario && S.salarios.length) {
         const ult = S.salarios[0];
@@ -2356,34 +2369,38 @@ async function initApp() {
         S.b2  = parseFloat(ult.bono2_bs)||0;
         S.cusd = parseFloat(ult.cesta_usd)||0;
         S.bcv = parseFloat(ult.tasa_dia)||S.bcv;
-        document.getElementById('inp-sal').value = S.salario;
-        document.getElementById('inp-b1').value  = S.b1;
-        document.getElementById('inp-b2').value  = S.b2;
-        document.getElementById('inp-cu').value  = S.cusd;
-        document.getElementById('inp-bcv').value = S.bcv;
+        setVal('inp-sal', S.salario);
+        setVal('inp-b1', S.b1);
+        setVal('inp-b2', S.b2);
+        setVal('inp-cu', S.cusd);
+        setVal('inp-bcv', S.bcv);
       }
     }
-
-    try { localStorage.setItem('fve4_' + (currentUser?.id||'anon'), JSON.stringify(S)); } catch {}
-    updateHdr(); liveCalc(); poblarSelectorTasas();
-    renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos();
     setSyncState('ok');
-
   } catch (err) {
+    console.error("Error in initApp fetch:", err);
     setSyncState('err', 'Sin conexión');
-    if (S.bcv && S.salario) { renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos(); }
+  } finally {
+    // Asegurar que siempre se guarde y se oculte el loading, incluso si hay errores
+    lsSave();
+    updateHdr(); liveCalc(); poblarSelectorTasas();
+    try {
+      renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos();
+    } catch(re) {
+      console.error("Error rendering on init:", re);
+    }
+    hideLoading();
   }
-  hideLoading();
 
   if (!S.bcv) {
     setTimeout(async () => {
       const { rate, fecha, fuente } = await fetchBCV();
       if (rate) {
         S.bcv = rate; S.bcvDate = fecha || hoy;
-        try { localStorage.setItem('fve4_' + (currentUser?.id||'anon'), JSON.stringify(S)); } catch {}
+        lsSave();
         updateHdr();
-        document.getElementById('inp-bcv').value = rate.toFixed(2);
-        document.getElementById('inp-dt').value  = S.bcvDate;
+        setVal('inp-bcv', rate.toFixed(2));
+        setVal('inp-dt', S.bcvDate);
         liveCalc();
         showStatus('cfg-status', 'ok', `✓ Tasa ${fuente}: Bs. ${N(rate)} cargada automáticamente`);
       }
