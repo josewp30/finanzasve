@@ -842,6 +842,96 @@ async function signOut() {
 }
 
 let appInitialized = false;
+let isInitializing = false;
+
+async function initApp() {
+  if (isInitializing) return;
+  isInitializing = true;
+
+  // 1. Mostrar lo que tengamos en LocalStorage INMEDIATAMENTE
+  const LS_KEY_USER = 'fve4_' + (currentUser?.id || 'anon');
+  S = { bcv:0, bcvDate:'', salario:0, b1:0, b2:0, cusd:0, gastos:[], gastosFijos:[], tasasHistoricas:[], salarios:[], tasaVista:0 };
+  try {
+    const d = localStorage.getItem(LS_KEY_USER);
+    if (d) {
+      const parsed = JSON.parse(d);
+      if (parsed) S = { ...S, ...parsed };
+    }
+  } catch(e) {}
+
+  // Sanitizar arrays
+  ['gastos','gastosFijos','tasasHistoricas','salarios'].forEach(k => { if(!Array.isArray(S[k])) S[k]=[]; });
+
+  // 2. Renderizado Inicial (Modo "Offline first")
+  const hoy = new Date().toISOString().split('T')[0];
+  const setVal = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
+  setVal('g-f', hoy); setVal('inp-dt', hoy); setVal('m-dt', hoy); setVal('ht-fecha', hoy);
+  setVal('g-mes-filtro', hoy.slice(0, 7));
+  if (S.bcv) setVal('inp-bcv', S.bcv);
+  if (S.salario) setVal('inp-sal', S.salario);
+  if (S.b1) setVal('inp-b1', S.b1);
+  if (S.b2) setVal('inp-b2', S.b2);
+  if (S.cusd) setVal('inp-cu', S.cusd);
+
+  updateHdr(); liveCalc(); setCur('usd'); S.tasaVista = S.bcv;
+  try { renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos(); } catch(e){}
+
+  // 3. OCULTAR LOADING YA (No esperar a la nube)
+  hideLoading();
+
+  // 4. Sincronizar en segundo plano
+  setSyncState('loading', 'Sincronizando...');
+
+  try {
+    const results = await Promise.allSettled([
+      apiGet('getTasas'),
+      apiGet('getGastosFijos'),
+      apiGet('getConfig'),
+      apiGet('getGastos'),
+      apiGet('getSalarios')
+    ]);
+
+    const [resTasas, resFijos, resCfg, resGastos, resSal] = results;
+
+    if (resTasas.status === 'fulfilled' && resTasas.value.status === 'ok') {
+      S.tasasHistoricas = resTasas.value.data
+        .map(t => ({ fecha: String(t.fecha||''), tasa: parseFloat(t.tasa)||0, fuente: t.fuente||'BCV' }))
+        .filter(t => t.fecha && t.tasa > 0)
+        .sort((a,b) => b.fecha.localeCompare(a.fecha));
+    }
+    if (resFijos.status === 'fulfilled' && resFijos.value.status === 'ok') {
+      S.gastosFijos = resFijos.value.data.map(g => ({ ...g, monto_usd: parseFloat(g.monto_usd)||0, activo: g.activo === true || g.activo === 'TRUE' }));
+    }
+    if (resCfg.status === 'fulfilled' && resCfg.value.status === 'ok') {
+      const cfg = resCfg.value.data;
+      if (cfg.bcv) { S.bcv = parseFloat(cfg.bcv); S.bcvDate = cfg.bcvDate || hoy; setVal('inp-bcv', S.bcv); }
+    }
+    if (resGastos.status === 'fulfilled' && resGastos.value.status === 'ok') {
+      const deSB = resGastos.value.data.map(g => ({
+        ...g, id: String(g.id||''), monto_usd: parseFloat(g.monto_usd)||0,
+        tasa_dia: parseFloat(g.tasa_dia)||S.bcv, monto_bs_dia: parseFloat(g.monto_bs_dia)||0
+      }));
+      const idsSB = new Set(deSB.map(g => g.id));
+      const pendientes = S.gastos.filter(g => g && String(g.id||'').startsWith('gto_') && !idsSB.has(String(g.id)));
+      S.gastos = [...deSB, ...pendientes];
+    }
+    if (resSal.status === 'fulfilled' && resSal.value.status === 'ok' && resSal.value.data.length) {
+      S.salarios = resSal.value.data.sort((a,b) => String(b.fecha||'').localeCompare(String(a.fecha||'')));
+      if (!S.salario) {
+        const u = S.salarios[0];
+        S.salario = parseFloat(u.salario_bs)||0; S.b1 = parseFloat(u.bono1_bs)||0; S.b2 = parseFloat(u.bono2_bs)||0; S.cusd = parseFloat(u.cesta_usd)||0;
+        setVal('inp-sal', S.salario); setVal('inp-b1', S.b1); setVal('inp-b2', S.b2); setVal('inp-cu', S.cusd);
+      }
+    }
+    setSyncState('ok');
+  } catch (err) {
+    setSyncState('err', 'Modo local');
+  } finally {
+    lsSave(); updateHdr(); liveCalc(); poblarSelectorTasas();
+    try { renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos(); } catch(re){}
+    isInitializing = false;
+  }
+}
 
 function onAuthStateChange() {
   sb.auth.onAuthStateChange(async (event, session) => {
@@ -849,15 +939,25 @@ function onAuthStateChange() {
       currentUser = session.user;
       SB_HDR = buildHeaders(session.access_token);
       hideAuthScreen();
+
+      // Mostrar info de usuario
+      const name = currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || '';
+      const email = currentUser.email || '';
+      const avatar = document.getElementById('user-avatar');
+      if (avatar) avatar.textContent = name ? name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2) : email.slice(0,2).toUpperCase();
+      setEl('user-email-lbl', email);
+      setEl('user-display-name', name || email.split('@')[0]);
+      const userInfo = document.getElementById('user-info');
+      if (userInfo) userInfo.style.display = 'flex';
+
       if (!appInitialized) {
         appInitialized = true;
-        // Esperar un tick para que el DOM de main-app se renderice antes de escribir en él
-        await new Promise(r => setTimeout(r, 50));
         await initApp();
       }
     } else if (event === 'SIGNED_OUT' || (!session && event !== 'INITIAL_SESSION')) {
       currentUser = null;
       appInitialized = false;
+      isInitializing = false;
       SB_HDR = buildHeaders(null);
       showAuthScreen();
     }
@@ -979,13 +1079,26 @@ async function getHdrs(extra = {}) {
   };
 }
 
+// Helper para fetch con timeout compatible (evita bloqueos infinitos)
+async function fetchWithTimeout(resource, options = {}) {
+  const { timeout = 15000 } = options;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(resource, { ...options, signal: controller.signal });
+    return response;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
 // GET — select rows
 async function sbGet(tabla, filtros = {}) {
   const url = new URL(`${SB_URL}/rest/v1/${tabla}`);
   url.searchParams.set('select', '*');
   Object.entries(filtros).forEach(([k, v]) => url.searchParams.set(k, `eq.${v}`));
   const hdrs = await getHdrs();
-  const r = await fetch(url.toString(), { headers: hdrs, signal: AbortSignal.timeout(20000) });
+  const r = await fetchWithTimeout(url.toString(), { headers: hdrs });
   if (!r.ok) { const t = await r.text(); throw new Error(`sbGet ${tabla}: ${r.status} ${t}`); }
   return r.json();
 }
@@ -993,10 +1106,9 @@ async function sbGet(tabla, filtros = {}) {
 // INSERT
 async function sbInsert(tabla, datos) {
   const hdrs = await getHdrs();
-  const r = await fetch(`${SB_URL}/rest/v1/${tabla}`, {
+  const r = await fetchWithTimeout(`${SB_URL}/rest/v1/${tabla}`, {
     method: 'POST', headers: hdrs,
-    body: JSON.stringify(datos),
-    signal: AbortSignal.timeout(20000),
+    body: JSON.stringify(datos)
   });
   if (!r.ok) { const t = await r.text(); throw new Error(`sbInsert ${tabla}: ${r.status} ${t}`); }
   const rows = await r.json();
@@ -1008,10 +1120,9 @@ async function sbUpsert(tabla, datos, onConflict = 'id') {
   const url = new URL(`${SB_URL}/rest/v1/${tabla}`);
   url.searchParams.set('on_conflict', onConflict);
   const hdrs = await getHdrs({ 'Prefer': 'return=representation,resolution=merge-duplicates' });
-  const r = await fetch(url.toString(), {
+  const r = await fetchWithTimeout(url.toString(), {
     method: 'POST', headers: hdrs,
-    body: JSON.stringify(datos),
-    signal: AbortSignal.timeout(20000),
+    body: JSON.stringify(datos)
   });
   if (!r.ok) { const t = await r.text(); throw new Error(`sbUpsert ${tabla}: ${r.status} ${t}`); }
   const rows = await r.json();
@@ -1023,10 +1134,7 @@ async function sbDelete(tabla, id) {
   const url = new URL(`${SB_URL}/rest/v1/${tabla}`);
   url.searchParams.set('id', `eq.${id}`);
   const hdrs = await getHdrs();
-  const r = await fetch(url.toString(), {
-    method: 'DELETE', headers: hdrs,
-    signal: AbortSignal.timeout(20000),
-  });
+  const r = await fetchWithTimeout(url.toString(), { method: 'DELETE' });
   if (!r.ok) { const t = await r.text(); throw new Error(`sbDelete ${tabla}: ${r.status} ${t}`); }
   return true;
 }
@@ -1048,11 +1156,11 @@ async function apiGet(accion, params = {}) {
     const url = new URL(`${SB_URL}/rest/v1/gastos`);
     url.searchParams.set('select', '*');
     url.searchParams.set('order', 'fecha.desc');
-    if (params.mes) {
+    if (params && params.mes) {
       url.searchParams.set('fecha', `gte.${params.mes}-01`);
       url.searchParams.append('fecha', `lte.${params.mes}-31`);
     }
-    const r = await fetch(url.toString(), { headers: hdrs, signal: AbortSignal.timeout(20000) });
+    const r = await fetchWithTimeout(url.toString(), { headers: hdrs });
     if (!r.ok) throw new Error('getGastos: ' + r.status);
     return { status: 'ok', data: await r.json() };
   }
@@ -2259,154 +2367,6 @@ function showLoading(msg) {
   setEl('loading-msg', msg || 'Cargando...');
 }
 function hideLoading() { document.getElementById('loading-overlay').classList.remove('open'); }
-
-// ═══════════════════════════════════════════════════════════
-//  INIT
-// ═══════════════════════════════════════════════════════════
-// initApp — llamado por onAuthStateChange cuando el usuario está logueado
-async function initApp() {
-  if (currentUser) {
-    const email     = currentUser.email || '';
-    const name      = currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || '';
-    const initials  = name ? name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2)
-                           : email.slice(0,2).toUpperCase();
-    const avatar    = document.getElementById('user-avatar');
-    const emailLbl  = document.getElementById('user-email-lbl');
-    const nameLbl   = document.getElementById('user-display-name');
-    const userInfo  = document.getElementById('user-info');
-    if (avatar)   avatar.textContent  = initials;
-    if (emailLbl) emailLbl.textContent = email;
-    if (nameLbl)  nameLbl.textContent  = name || email.split('@')[0];
-    if (userInfo) userInfo.style.display = 'flex';
-  }
-
-  // Resetear estado al cambiar de usuario
-  S = { bcv:0, bcvDate:'', salario:0, b1:0, b2:0, cusd:0, gastos:[], gastosFijos:[], tasasHistoricas:[], salarios:[], tasaVista:0 };
-  const LS_KEY_USER = 'fve4_' + (currentUser?.id || 'anon');
-  try {
-    const d = localStorage.getItem(LS_KEY_USER);
-    if (d) {
-      const parsed = JSON.parse(d);
-      if (parsed && typeof parsed === 'object') S = { ...S, ...parsed };
-    }
-  } catch(e) { console.error("Error loading localStorage:", e); }
-
-  // Sanitización para evitar crashes si localStorage tiene datos corruptos
-  if (!Array.isArray(S.gastos)) S.gastos = [];
-  if (!Array.isArray(S.gastosFijos)) S.gastosFijos = [];
-  if (!Array.isArray(S.tasasHistoricas)) S.tasasHistoricas = [];
-  if (!Array.isArray(S.salarios)) S.salarios = [];
-
-  const hoy = new Date().toISOString().split('T')[0];
-  const setVal = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
-
-  setVal('g-f', hoy);
-  gTasaDiaActual = S.bcv || 0;
-  if (S.bcv > 0) {
-    setTasaBox('ok', S.bcv, hoy, '✓ Tasa activa (hoy)');
-    const addBtn = document.getElementById('g-btn-add');
-    if (addBtn) addBtn.disabled = false;
-  }
-  setVal('inp-dt', hoy);
-  setVal('m-dt', hoy);
-  setVal('ht-fecha', hoy);
-  const mesActual = hoy.slice(0, 7);
-  setVal('g-mes-filtro', mesActual);
-
-  if (S.bcv)     { setVal('inp-bcv', S.bcv); setVal('inp-dt', S.bcvDate || hoy); }
-  if (S.salario) setVal('inp-sal', S.salario);
-  if (S.b1)      setVal('inp-b1', S.b1);
-  if (S.b2)      setVal('inp-b2', S.b2);
-  if (S.cusd)    setVal('inp-cu', S.cusd);
-
-  updateHdr(); liveCalc(); setCur('usd');
-  S.tasaVista = S.bcv;
-
-  // Sincronizar con Supabase
-  setSyncState('loading', 'Conectando...');
-  showLoading('Cargando tu data...');
-
-  try {
-    const resTasas = await apiGet('getTasas');
-    if (resTasas.status === 'ok' && Array.isArray(resTasas.data)) {
-      S.tasasHistoricas = resTasas.data
-        .map(t => ({ fecha: String(t.fecha||''), tasa: parseFloat(t.tasa)||0, fuente: t.fuente||'BCV' }))
-        .filter(t => t.fecha && t.tasa > 0)
-        .sort((a,b) => b.fecha.localeCompare(a.fecha));
-    }
-
-    const resFijos = await apiGet('getGastosFijos');
-    if (resFijos.status === 'ok' && Array.isArray(resFijos.data)) {
-      S.gastosFijos = resFijos.data.map(g => ({ ...g, monto_usd: parseFloat(g.monto_usd)||0, activo: g.activo === true || g.activo === 'TRUE' }));
-    }
-
-    const resCfg = await apiGet('getConfig');
-    if (resCfg.status === 'ok' && resCfg.data) {
-      const cfg = resCfg.data;
-      if (cfg.bcv && !S.bcv) { S.bcv = parseFloat(cfg.bcv); S.bcvDate = cfg.bcvDate || hoy; }
-    }
-
-    const resGastos = await apiGet('getGastos');
-    if (resGastos.status === 'ok' && Array.isArray(resGastos.data)) {
-      const deSB = resGastos.data.map(g => ({
-        ...g, id: String(g.id||''),
-        monto_usd:    parseFloat(g.monto_usd)||0,
-        tasa_dia:     parseFloat(g.tasa_dia)||S.bcv,
-        monto_bs_dia: parseFloat(g.monto_bs_dia)||0,
-      }));
-      const idsSB = new Set(deSB.map(g => g.id));
-      const pendientes = S.gastos.filter(g => g && String(g.id||'').startsWith('gto_') && !idsSB.has(String(g.id)));
-      S.gastos = [...deSB, ...pendientes];
-    }
-
-    const resSal = await apiGet('getSalarios');
-    if (resSal.status === 'ok' && Array.isArray(resSal.data)) {
-      S.salarios = resSal.data.sort((a,b) => String(b.fecha||'').localeCompare(String(a.fecha||'')));
-      if (!S.salario && S.salarios.length) {
-        const ult = S.salarios[0];
-        S.salario = parseFloat(ult.salario_bs)||0;
-        S.b1  = parseFloat(ult.bono1_bs)||0;
-        S.b2  = parseFloat(ult.bono2_bs)||0;
-        S.cusd = parseFloat(ult.cesta_usd)||0;
-        S.bcv = parseFloat(ult.tasa_dia)||S.bcv;
-        setVal('inp-sal', S.salario);
-        setVal('inp-b1', S.b1);
-        setVal('inp-b2', S.b2);
-        setVal('inp-cu', S.cusd);
-        setVal('inp-bcv', S.bcv);
-      }
-    }
-    setSyncState('ok');
-  } catch (err) {
-    console.error("Error in initApp fetch:", err);
-    setSyncState('err', 'Sin conexión');
-  } finally {
-    // Asegurar que siempre se guarde y se oculte el loading, incluso si hay errores
-    lsSave();
-    updateHdr(); liveCalc(); poblarSelectorTasas();
-    try {
-      renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos();
-    } catch(re) {
-      console.error("Error rendering on init:", re);
-    }
-    hideLoading();
-  }
-
-  if (!S.bcv) {
-    setTimeout(async () => {
-      const { rate, fecha, fuente } = await fetchBCV();
-      if (rate) {
-        S.bcv = rate; S.bcvDate = fecha || hoy;
-        lsSave();
-        updateHdr();
-        setVal('inp-bcv', rate.toFixed(2));
-        setVal('inp-dt', S.bcvDate);
-        liveCalc();
-        showStatus('cfg-status', 'ok', `✓ Tasa ${fuente}: Bs. ${N(rate)} cargada automáticamente`);
-      }
-    }, 500);
-  }
-}
 
 // window.onload — solo lanza el listener de auth
 window.onload = () => {
