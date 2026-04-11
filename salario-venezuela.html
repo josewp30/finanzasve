@@ -900,7 +900,12 @@ async function initApp() {
         .sort((a,b) => b.fecha.localeCompare(a.fecha));
     }
     if (resFijos.status === 'fulfilled' && resFijos.value.status === 'ok') {
-      S.gastosFijos = resFijos.value.data.map(g => ({ ...g, monto_usd: parseFloat(g.monto_usd)||0, activo: g.activo === true || g.activo === 'TRUE' }));
+      // Mapeo robusto: manejar casos donde activo no sea booleano puro
+      S.gastosFijos = resFijos.value.data.map(g => ({
+        ...g,
+        monto_usd: parseFloat(g.monto_usd) || 0,
+        activo: g.activo === true || String(g.activo).toLowerCase() === 'true' || g.activo === 1
+      }));
     }
     if (resCfg.status === 'fulfilled' && resCfg.value.status === 'ok') {
       const cfg = resCfg.value.data;
@@ -1166,7 +1171,7 @@ async function apiGet(accion, params = {}) {
   if (accion === 'init')           return { status: 'ok', data: { ok: true } };
   if (accion === 'getTasas')       return { status: 'ok', data: await sbGet('tasas_bcv') };
   if (accion === 'getSalarios')    return { status: 'ok', data: await sbGet('salarios') };
-  if (accion === 'getGastosFijos') return { status: 'ok', data: await sbGet('gastos_fijos', { activo: true }) };
+  if (accion === 'getGastosFijos') return { status: 'ok', data: await sbGet('gastos_fijos') };
   if (accion === 'getConfig') {
     const rows = await sbGet('config') || [];
     const cfg = {};
