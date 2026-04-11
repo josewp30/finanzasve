@@ -1945,21 +1945,26 @@ async function delGastoFijo(id) {
 }
 
 function renderGastosFijos() {
-  const fijos = S.gastosFijos.filter(g => g.activo !== false && g.activo !== 'FALSE');
-  const empty = document.getElementById('gf-empty'), list = document.getElementById('gf-list');
+  const fijos = S.gastosFijos || [];
+  const empty = document.getElementById('gf-empty');
+  const list = document.getElementById('gf-list');
   const bcv = S.bcv || 0;
 
-  if (!fijos.length) { empty.style.display = 'block'; list.innerHTML = ''; }
-  else {
-    empty.style.display = 'none';
+  if (!list) return;
+
+  if (!fijos.length) {
+    if (empty) empty.style.display = 'block';
+    list.innerHTML = '';
+  } else {
+    if (empty) empty.style.display = 'none';
     list.innerHTML = fijos.map(g => {
       const usd = parseFloat(g.monto_usd) || 0;
-      const bs = bsFromUSD(usd, bcv);
+      const bs = usd * bcv;
       return `<div style="display:flex;align-items:center;gap:.7rem;background:var(--navy3);border-radius:8px;padding:.65rem .9rem;margin-bottom:.4rem;">
         <span style="color:var(--gold2);font-size:1rem;">📌</span>
         <div style="flex:1;">
-          <div style="font-size:.85rem;">${g.descripcion}</div>
-          <div class="xs muted"><span class="bdg bdg-gold">${g.categoria}</span> · mensual</div>
+          <div style="font-size:.85rem;">${g.descripcion || 'Sin descripción'}</div>
+          <div class="xs muted"><span class="bdg bdg-gold">${g.categoria || 'Gasto'}</span> · mensual</div>
         </div>
         <div style="text-align:right;">
           <div class="mono teal" style="font-weight:500;">${fUSD(usd)}</div>
@@ -1972,7 +1977,7 @@ function renderGastosFijos() {
 
   const totUSD = fijos.reduce((a, g) => a + (parseFloat(g.monto_usd) || 0), 0);
   setEl('gf-total-usd', fUSD(totUSD));
-  setEl('gf-total-bs', `Bs. ${N(bsFromUSD(totUSD, bcv))} a tasa activa`);
+  setEl('gf-total-bs', `Bs. ${N(totUSD * bcv)} a tasa activa`);
 }
 
 // ═══════════════════════════════════════════════════════════
