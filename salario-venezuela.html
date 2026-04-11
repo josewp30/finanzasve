@@ -225,7 +225,9 @@ input::placeholder{color:var(--text2);font-family:'IBM Plex Sans',sans-serif;}
 <!-- LOADING -->
 <div class="loading-overlay" id="loading-overlay">
   <div class="spinner"></div>
-  <div style="font-size:.85rem;color:var(--text2);" id="loading-msg">Conectando con Google Sheets...</div>
+  <div style="font-size:.85rem;color:var(--text2);margin-top:1rem;" id="loading-msg">Conectando...</div>
+  <!-- Botón de emergencia si tarda más de 5s -->
+  <button id="btn-force-close" onclick="hideLoading()" style="margin-top:2rem;background:transparent;border:1px solid var(--border);color:var(--text2);padding:.5rem 1rem;border-radius:20px;font-size:.7rem;cursor:pointer;display:none;z-index:9999;">✕ Cancelar espera</button>
 </div>
 
 <!-- TOP BAR -->
@@ -2405,26 +2407,33 @@ function showStatus(id, type, msg) {
   el.textContent = msg;
 }
 let loadingTimer = null;
+let forceBtnTimer = null;
 function showLoading(msg) {
   const overlay = document.getElementById('loading-overlay');
+  const btn = document.getElementById('btn-force-close');
   if (!overlay) return;
   overlay.classList.add('open');
+  if (btn) btn.style.display = 'none';
   setEl('loading-msg', msg || 'Cargando...');
 
-  // LIMPIEZA: Si ya había un temporizador, lo quitamos
   if (loadingTimer) clearTimeout(loadingTimer);
+  if (forceBtnTimer) clearTimeout(forceBtnTimer);
 
-  // EMERGENCIA: Si en 10 segundos no se ha cerrado, lo forzamos.
-  // Esto garantiza que el usuario NUNCA se quede bloqueado.
+  // Mostrar botón "X" tras 5s
+  forceBtnTimer = setTimeout(() => {
+    if (btn) btn.style.display = 'inline-block';
+  }, 5000);
+
+  // Forzar cierre tras 12s
   loadingTimer = setTimeout(() => {
-    console.warn("Cierre de emergencia de pantalla de carga");
     hideLoading();
-  }, 10000);
+  }, 12000);
 }
 function hideLoading() {
   const overlay = document.getElementById('loading-overlay');
   if (overlay) overlay.classList.remove('open');
   if (loadingTimer) clearTimeout(loadingTimer);
+  if (forceBtnTimer) clearTimeout(forceBtnTimer);
 }
 
 // window.onload — solo lanza el listener de auth
