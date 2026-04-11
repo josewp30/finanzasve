@@ -797,12 +797,12 @@ input::placeholder{color:var(--text2);font-family:'IBM Plex Sans',sans-serif;}
 // ═══════════════════════════════════════════════════════════
 const SB_URL = 'https://tdcpdjhwvpkrxgmnpftv.supabase.co';
 const SB_KEY = 'sb_publishable_ytx1M7anayE7g7_SnGQCxw_ZMjYNsnM';
-const sb     = supabase.createClient(SB_URL, SB_KEY, {
+const sb = supabase.createClient(SB_URL, SB_KEY, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true,   // ← captura el token que Google devuelve en la URL
-    flowType: 'implicit',       // ← modo compatible con apps de una sola página
+    detectSessionInUrl: true,
+    flowType: 'pkce',
   }
 });
 
