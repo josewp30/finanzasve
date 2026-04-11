@@ -497,8 +497,13 @@ input::placeholder{color:var(--text2);font-family:'IBM Plex Sans',sans-serif;}
          GASTOS FIJOS
     ════════════════════════════════════════════════ -->
     <div class="page" id="page-fijos">
-      <div class="pg-title">Gastos Fijos</div>
-      <div class="pg-sub">Gastos recurrentes en USD. Se actualizan automáticamente con la tasa BCV activa cada mes.</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;">
+        <div>
+          <div class="pg-title">Gastos Fijos</div>
+          <div class="pg-sub">Gastos recurrentes en USD. Se actualizan automáticamente con la tasa BCV activa cada mes.</div>
+        </div>
+        <button class="btn btn-t btn-sm" onclick="syncGastosFijos()">⟳ Actualizar</button>
+      </div>
       <div class="g2">
         <div class="card">
           <div class="card-lbl">Nuevo Gasto Fijo</div>
@@ -1946,7 +1951,34 @@ async function delGastoFijo(id) {
   } catch { setSyncState('err', 'Sin conexión — borrado solo localmente'); }
 }
 
-function renderGastosFijos() {
+// ═══════════════════════════════════════════════════════════
+//  SYNC GASTOS FIJOS
+// ═══════════════════════════════════════════════════════════
+async function syncGastosFijos() {
+  showLoading('Sincronizando gastos fijos...');
+  try {
+    const res = await apiGet('getGastosFijos');
+    if (res && res.status === 'ok' && Array.isArray(res.data)) {
+      // Solo sobrescribir si hay datos nuevos o si confirmamos que la nube tiene prioridad
+      if (res.data.length > 0 || S.gastosFijos.length === 0) {
+        S.gastosFijos = res.data.map(g => ({
+          ...g,
+          monto_usd: parseFloat(g.monto_usd) || 0,
+          activo: true // Por defecto activos si vienen de la nube
+        }));
+        lsSave();
+      }
+      setSyncState('ok');
+    }
+  } catch (e) {
+    console.error("Error sync fijos:", e);
+    setSyncState('err', 'Error de red');
+  } finally {
+    renderGastosFijos();
+    renderAhorro();
+    hideLoading();
+  }
+}
   const fijos = S.gastosFijos || [];
   const empty = document.getElementById('gf-empty');
   const list = document.getElementById('gf-list');
