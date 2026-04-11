@@ -1073,9 +1073,17 @@ let tokenExpiry = 0;
 async function getHdrs(extra = {}) {
   const now = Date.now();
   if (!cachedToken || now > tokenExpiry) {
-    const { data } = await sb.auth.getSession();
-    cachedToken = data?.session?.access_token || SB_KEY;
-    tokenExpiry = now + 300000; // Cache por 5 min
+    try {
+      // Timeout de 5s para obtener la sesión, si falla usamos la key anónima
+      const sessionPromise = sb.auth.getSession();
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth timeout')), 5000));
+      const { data } = await Promise.race([sessionPromise, timeoutPromise]);
+      cachedToken = data?.session?.access_token || SB_KEY;
+    } catch (e) {
+      console.warn("Usando key default por demora en auth");
+      cachedToken = SB_KEY;
+    }
+    tokenExpiry = now + 300000;
   }
   return {
     'apikey': SB_KEY,
@@ -2386,11 +2394,28 @@ function showStatus(id, type, msg) {
   el.style.cssText = 'display:block;margin-top:.9rem;font-size:.8rem;padding:.7rem 1rem;border-radius:8px;' + (styles[type] || styles.ok);
   el.textContent = msg;
 }
+let loadingTimer = null;
 function showLoading(msg) {
-  document.getElementById('loading-overlay').classList.add('open');
+  const overlay = document.getElementById('loading-overlay');
+  if (!overlay) return;
+  overlay.classList.add('open');
   setEl('loading-msg', msg || 'Cargando...');
+
+  // LIMPIEZA: Si ya había un temporizador, lo quitamos
+  if (loadingTimer) clearTimeout(loadingTimer);
+
+  // EMERGENCIA: Si en 10 segundos no se ha cerrado, lo forzamos.
+  // Esto garantiza que el usuario NUNCA se quede bloqueado.
+  loadingTimer = setTimeout(() => {
+    console.warn("Cierre de emergencia de pantalla de carga");
+    hideLoading();
+  }, 10000);
 }
-function hideLoading() { document.getElementById('loading-overlay').classList.remove('open'); }
+function hideLoading() {
+  const overlay = document.getElementById('loading-overlay');
+  if (overlay) overlay.classList.remove('open');
+  if (loadingTimer) clearTimeout(loadingTimer);
+}
 
 // window.onload — solo lanza el listener de auth
 window.onload = () => {
