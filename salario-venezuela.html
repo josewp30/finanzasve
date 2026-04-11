@@ -1147,12 +1147,19 @@ async function fetchWithTimeout(resource, options = {}) {
 // GET — select rows con blindaje
 async function sbGet(tabla, filtros = {}) {
   try {
+    const uid = currentUser?.id;
+    if (!uid) return [];
+
     const url = new URL(`${SB_URL}/rest/v1/${tabla}`);
     url.searchParams.set('select', '*');
-    Object.entries(filtros).forEach(([k, v]) => url.searchParams.set(k, `eq.${v}`));
+    url.searchParams.set('user_id', `eq.${uid}`); // Filtro de seguridad obligatorio
+
+    Object.entries(filtros).forEach(([k, v]) => {
+      if (k !== 'user_id') url.searchParams.set(k, `eq.${v}`);
+    });
+
     const hdrs = await getHdrs();
-    // Timeout más corto para que no se quede "colgado" en móviles
-    const r = await fetchWithTimeout(url.toString(), { headers: hdrs, timeout: 8000 });
+    const r = await fetchWithTimeout(url.toString(), { headers: hdrs, timeout: 10000 });
     if (!r.ok) return [];
     const data = await r.json();
     return Array.isArray(data) ? data : [];
@@ -1201,28 +1208,36 @@ async function sbDelete(tabla, id) {
 // Compat wrappers — mantienen el mismo contrato que el código que llama a apiGet/apiPost
 async function apiGet(accion, params = {}) {
   if (accion === 'init')           return { status: 'ok', data: { ok: true } };
+
+  // Para estas tablas, el filtro de user_id ya va implícito en sbGet
   if (accion === 'getTasas')       return { status: 'ok', data: await sbGet('tasas_bcv') };
   if (accion === 'getSalarios')    return { status: 'ok', data: await sbGet('salarios') };
   if (accion === 'getGastosFijos') return { status: 'ok', data: await sbGet('gastos_fijos') };
+
   if (accion === 'getConfig') {
     const rows = await sbGet('config') || [];
     const cfg = {};
-    if (Array.isArray(rows)) {
-      rows.forEach(r => { if(r && r.clave) cfg[r.clave] = r.valor; });
-    }
+    rows.forEach(r => { if(r && r.clave) cfg[r.clave] = r.valor; });
     return { status: 'ok', data: cfg };
   }
+
   if (accion === 'getGastos') {
-    const hdrs = await getHdrs();
+    const uid = currentUser?.id;
+    if (!uid) return { status: 'ok', data: [] };
+
     const url = new URL(`${SB_URL}/rest/v1/gastos`);
     url.searchParams.set('select', '*');
+    url.searchParams.set('user_id', `eq.${uid}`);
     url.searchParams.set('order', 'fecha.desc');
+
     if (params && params.mes) {
       url.searchParams.set('fecha', `gte.${params.mes}-01`);
       url.searchParams.append('fecha', `lte.${params.mes}-31`);
     }
+
+    const hdrs = await getHdrs();
     const r = await fetchWithTimeout(url.toString(), { headers: hdrs });
-    if (!r.ok) throw new Error('getGastos: ' + r.status);
+    if (!r.ok) return { status: 'ok', data: [] };
     return { status: 'ok', data: await r.json() };
   }
   throw new Error('apiGet acción desconocida: ' + accion);
