@@ -1112,13 +1112,12 @@ async function getHdrs(extra = {}) {
   const now = Date.now();
   if (!cachedToken || now > tokenExpiry) {
     try {
-      // Timeout de 5s para obtener la sesión, si falla usamos la key anónima
-      const sessionPromise = sb.auth.getSession();
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Auth timeout')), 5000));
-      const { data } = await Promise.race([sessionPromise, timeoutPromise]);
+      // Timeout de 12s (más generoso para móviles)
+      const { data, error } = await sb.auth.getSession();
+      if (error) throw error;
       cachedToken = data?.session?.access_token || SB_KEY;
     } catch (e) {
-      console.warn("Usando key default por demora en auth");
+      console.warn("Error obteniendo sesión, reintentando con key base");
       cachedToken = SB_KEY;
     }
     tokenExpiry = now + 300000;
