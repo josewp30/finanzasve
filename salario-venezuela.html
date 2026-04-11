@@ -1099,15 +1099,22 @@ async function fetchWithTimeout(resource, options = {}) {
   }
 }
 
-// GET — select rows
+// GET — select rows con blindaje
 async function sbGet(tabla, filtros = {}) {
-  const url = new URL(`${SB_URL}/rest/v1/${tabla}`);
-  url.searchParams.set('select', '*');
-  Object.entries(filtros).forEach(([k, v]) => url.searchParams.set(k, `eq.${v}`));
-  const hdrs = await getHdrs();
-  const r = await fetchWithTimeout(url.toString(), { headers: hdrs });
-  if (!r.ok) { const t = await r.text(); throw new Error(`sbGet ${tabla}: ${r.status} ${t}`); }
-  return r.json();
+  try {
+    const url = new URL(`${SB_URL}/rest/v1/${tabla}`);
+    url.searchParams.set('select', '*');
+    Object.entries(filtros).forEach(([k, v]) => url.searchParams.set(k, `eq.${v}`));
+    const hdrs = await getHdrs();
+    // Timeout más corto para que no se quede "colgado" en móviles
+    const r = await fetchWithTimeout(url.toString(), { headers: hdrs, timeout: 8000 });
+    if (!r.ok) return [];
+    const data = await r.json();
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    console.warn(`sbGet ${tabla} fallo:`, e);
+    return [];
+  }
 }
 
 // INSERT
@@ -1153,9 +1160,11 @@ async function apiGet(accion, params = {}) {
   if (accion === 'getSalarios')    return { status: 'ok', data: await sbGet('salarios') };
   if (accion === 'getGastosFijos') return { status: 'ok', data: await sbGet('gastos_fijos', { activo: true }) };
   if (accion === 'getConfig') {
-    const rows = await sbGet('config');
+    const rows = await sbGet('config') || [];
     const cfg = {};
-    rows.forEach(r => { cfg[r.clave] = r.valor; });
+    if (Array.isArray(rows)) {
+      rows.forEach(r => { if(r && r.clave) cfg[r.clave] = r.valor; });
+    }
     return { status: 'ok', data: cfg };
   }
   if (accion === 'getGastos') {
