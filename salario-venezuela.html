@@ -863,92 +863,50 @@ async function initApp() {
   if (isInitializing) return;
   isInitializing = true;
 
-  // 1. Mostrar lo que tengamos en LocalStorage INMEDIATAMENTE
-  const LS_KEY_USER = 'fve4_' + (currentUser?.id || 'anon');
-  S = { bcv:0, bcvDate:'', salario:0, b1:0, b2:0, cusd:0, gastos:[], gastosFijos:[], tasasHistoricas:[], salarios:[], tasaVista:0 };
   try {
-    const d = localStorage.getItem(LS_KEY_USER);
+    // 1. Cargar datos locales inmediatamente
+    const uid = currentUser?.id || 'anon';
+    const LS_KEY_USER = 'fve4_' + uid;
+    const d = localStorage.getItem(LS_KEY_USER) || localStorage.getItem(LS_KEY);
+
     if (d) {
       const parsed = JSON.parse(d);
       if (parsed) S = { ...S, ...parsed };
     }
-  } catch(e) {}
 
-  // Sanitizar arrays
-  ['gastos','gastosFijos','tasasHistoricas','salarios'].forEach(k => { if(!Array.isArray(S[k])) S[k]=[]; });
+    // Sanitizar
+    ['gastos','gastosFijos','tasasHistoricas','salarios'].forEach(k => { if(!Array.isArray(S[k])) S[k]=[]; });
 
-  // 2. Renderizado Inicial (Modo "Offline first")
-  const hoy = new Date().toISOString().split('T')[0];
-  const setVal = (id, v) => { const e = document.getElementById(id); if (e) e.value = v; };
-  setVal('g-f', hoy); setVal('inp-dt', hoy); setVal('m-dt', hoy); setVal('ht-fecha', hoy);
-  setVal('g-mes-filtro', hoy.slice(0, 7));
-  if (S.bcv) setVal('inp-bcv', S.bcv);
-  if (S.salario) setVal('inp-sal', S.salario);
-  if (S.b1) setVal('inp-b1', S.b1);
-  if (S.b2) setVal('inp-b2', S.b2);
-  if (S.cusd) setVal('inp-cu', S.cusd);
+    // Render inicial
+    updateHdr(); liveCalc();
+    renderResumen(); renderSemanal(); renderGastos(); renderGastosFijos();
+    hideLoading();
+  } catch(e) { console.error("Error local load:", e); hideLoading(); }
 
-  updateHdr(); liveCalc(); setCur('usd'); S.tasaVista = S.bcv;
-  try { renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos(); } catch(e){}
-
-  // 3. OCULTAR LOADING YA (No esperar a la nube)
-  hideLoading();
-
-  // 4. Sincronizar en segundo plano
-  setSyncState('loading', 'Sincronizando...');
-
+  // 2. Sincronizar con Supabase en segundo plano
+  setSyncState('loading');
   try {
-    const results = await Promise.allSettled([
-      apiGet('getTasas'),
-      apiGet('getGastosFijos'),
-      apiGet('getConfig'),
-      apiGet('getGastos'),
-      apiGet('getSalarios')
+    const [resTasas, resFijos, resCfg, resGastos, resSal] = await Promise.all([
+      apiGet('getTasas').catch(e => ({status:'err'})),
+      apiGet('getGastosFijos').catch(e => ({status:'err'})),
+      apiGet('getConfig').catch(e => ({status:'err'})),
+      apiGet('getGastos').catch(e => ({status:'err'})),
+      apiGet('getSalarios').catch(e => ({status:'err'}))
     ]);
 
-    const [resTasas, resFijos, resCfg, resGastos, resSal] = results;
+    if (resTasas.status === 'ok') S.tasasHistoricas = resTasas.data.sort((a,b) => b.fecha.localeCompare(a.fecha));
+    if (resFijos.status === 'ok') S.gastosFijos = resFijos.data;
+    if (resCfg.status === 'ok' && resCfg.data.bcv) { S.bcv = parseFloat(resCfg.data.bcv); S.bcvDate = resCfg.data.bcvDate; }
+    if (resGastos.status === 'ok') S.gastos = resGastos.data;
+    if (resSal.status === 'ok') S.salarios = resSal.data;
 
-    if (resTasas.status === 'fulfilled' && resTasas.value.status === 'ok') {
-      S.tasasHistoricas = resTasas.value.data
-        .map(t => ({ fecha: String(t.fecha||''), tasa: parseFloat(t.tasa)||0, fuente: t.fuente||'BCV' }))
-        .filter(t => t.fecha && t.tasa > 0)
-        .sort((a,b) => b.fecha.localeCompare(a.fecha));
-    }
-    if (resFijos.status === 'fulfilled' && resFijos.value.status === 'ok') {
-      // Mapeo robusto: manejar casos donde activo no sea booleano puro
-      S.gastosFijos = resFijos.value.data.map(g => ({
-        ...g,
-        monto_usd: parseFloat(g.monto_usd) || 0,
-        activo: g.activo === true || String(g.activo).toLowerCase() === 'true' || g.activo === 1
-      }));
-    }
-    if (resCfg.status === 'fulfilled' && resCfg.value.status === 'ok') {
-      const cfg = resCfg.value.data;
-      if (cfg.bcv) { S.bcv = parseFloat(cfg.bcv); S.bcvDate = cfg.bcvDate || hoy; setVal('inp-bcv', S.bcv); }
-    }
-    if (resGastos.status === 'fulfilled' && resGastos.value.status === 'ok') {
-      const deSB = resGastos.value.data.map(g => ({
-        ...g, id: String(g.id||''), monto_usd: parseFloat(g.monto_usd)||0,
-        tasa_dia: parseFloat(g.tasa_dia)||S.bcv, monto_bs_dia: parseFloat(g.monto_bs_dia)||0
-      }));
-      const idsSB = new Set(deSB.map(g => g.id));
-      const pendientes = S.gastos.filter(g => g && String(g.id||'').startsWith('gto_') && !idsSB.has(String(g.id)));
-      S.gastos = [...deSB, ...pendientes];
-    }
-    if (resSal.status === 'fulfilled' && resSal.value.status === 'ok' && resSal.value.data.length) {
-      S.salarios = resSal.value.data.sort((a,b) => String(b.fecha||'').localeCompare(String(a.fecha||'')));
-      if (!S.salario) {
-        const u = S.salarios[0];
-        S.salario = parseFloat(u.salario_bs)||0; S.b1 = parseFloat(u.bono1_bs)||0; S.b2 = parseFloat(u.bono2_bs)||0; S.cusd = parseFloat(u.cesta_usd)||0;
-        setVal('inp-sal', S.salario); setVal('inp-b1', S.b1); setVal('inp-b2', S.b2); setVal('inp-cu', S.cusd);
-      }
-    }
+    lsSave(); updateHdr(); liveCalc();
+    renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos();
     setSyncState('ok');
   } catch (err) {
+    console.warn("Fallo sincronización nube:", err);
     setSyncState('err', 'Modo local');
   } finally {
-    lsSave(); updateHdr(); liveCalc(); poblarSelectorTasas();
-    try { renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos(); } catch(re){}
     isInitializing = false;
   }
 }
@@ -1109,38 +1067,29 @@ let cachedToken = null;
 let tokenExpiry = 0;
 
 async function getHdrs(extra = {}) {
-  const now = Date.now();
-  if (!cachedToken || now > tokenExpiry) {
-    try {
-      // Timeout de 12s (más generoso para móviles)
-      const { data, error } = await sb.auth.getSession();
-      if (error) throw error;
-      cachedToken = data?.session?.access_token || SB_KEY;
-    } catch (e) {
-      console.warn("Error obteniendo sesión, reintentando con key base");
-      cachedToken = SB_KEY;
-    }
-    tokenExpiry = now + 300000;
-  }
+  const session = (await sb.auth.getSession()).data?.session;
+  const token = session?.access_token || SB_KEY;
   return {
     'apikey': SB_KEY,
-    'Authorization': 'Bearer ' + cachedToken,
+    'Authorization': 'Bearer ' + token,
     'Content-Type': 'application/json',
     'Prefer': 'return=representation',
     ...extra,
   };
 }
 
-// Helper para fetch con timeout compatible (evita bloqueos infinitos)
+// Helper para fetch con timeout compatible
 async function fetchWithTimeout(resource, options = {}) {
   const { timeout = 15000 } = options;
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeout);
   try {
     const response = await fetch(resource, { ...options, signal: controller.signal });
-    return response;
-  } finally {
     clearTimeout(id);
+    return response;
+  } catch (e) {
+    clearTimeout(id);
+    throw e;
   }
 }
 
