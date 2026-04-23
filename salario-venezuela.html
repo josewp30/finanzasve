@@ -796,7 +796,10 @@ input::placeholder{color:var(--text2);font-family:'IBM Plex Sans',sans-serif;}
 //  SUPABASE — AUTH + DB
 // ═══════════════════════════════════════════════════════════
 const SB_URL = 'https://tdcpdjhwvpkrxgmnpftv.supabase.co';
-const SB_KEY = 'sb_publishable_ytx1M7anayE7g7_SnGQCxw_ZMjYNsnM';
+// ⚠️ IMPORTANTE: Reemplaza esto con tu anon key real de Supabase.
+// Encuéntrala en: supabase.com → tu proyecto → Settings → API → "anon public"
+// Debe empezar con "eyJ..." (es un JWT largo)
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkY3Bkamh3dnBrcnhnbW5wZnR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNTUwMzEsImV4cCI6MjA4ODkzMTAzMX0.YqdHUV2O0ELXd1wJJTzTRvNUA06G6F2xlLJ33T9lMD8';
 const sb = supabase.createClient(SB_URL, SB_KEY, {
   auth: {
     autoRefreshToken: true,
@@ -806,17 +809,7 @@ const sb = supabase.createClient(SB_URL, SB_KEY, {
   }
 });
 
-let SB_HDR = {};
 let currentUser = null;
-
-function buildHeaders(token) {
-  return {
-    'apikey': SB_KEY,
-    'Authorization': 'Bearer ' + (token || SB_KEY),
-    'Content-Type': 'application/json',
-    'Prefer': 'return=representation',
-  };
-}
 
 // ── Auth helpers ──────────────────────────────────────────
 async function signUp(email, password) {
@@ -943,7 +936,6 @@ function onAuthStateChange() {
   sb.auth.onAuthStateChange(async (event, session) => {
     if (session && session.user) {
       currentUser = session.user;
-      SB_HDR = buildHeaders(session.access_token);
       hideAuthScreen();
 
       // Mostrar info de usuario
@@ -964,7 +956,6 @@ function onAuthStateChange() {
       currentUser = null;
       appInitialized = false;
       isInitializing = false;
-      SB_HDR = buildHeaders(null);
       showAuthScreen();
     }
   });
@@ -1081,7 +1072,8 @@ const lsSave = () => {
 const lsSaveUser = lsSave;
 
 // ═══════════════════════════════════════════════════════════
-//  SUPABASE API LAYER
+//  SUPABASE API LAYER — usa el cliente JS oficial (sin fetch manual)
+//  Esto garantiza que el JWT se inyecta siempre correctamente.
 // ═══════════════════════════════════════════════════════════
 function setSyncState(state, msg) {
   const dot = document.getElementById('sync-dot');
@@ -1090,23 +1082,7 @@ function setSyncState(state, msg) {
   if (lbl) lbl.textContent = msg || (state === 'ok' ? 'Sincronizado' : state === 'err' ? 'Sin conexión' : 'Sincronizando...');
 }
 
-// Siempre obtiene el token fresco de la sesión activa
-let cachedToken = null;
-let tokenExpiry = 0;
-
-async function getHdrs(extra = {}) {
-  const session = (await sb.auth.getSession()).data?.session;
-  const token = session?.access_token || SB_KEY;
-  return {
-    'apikey': SB_KEY,
-    'Authorization': 'Bearer ' + token,
-    'Content-Type': 'application/json',
-    'Prefer': 'return=representation',
-    ...extra,
-  };
-}
-
-// Helper para fetch con timeout compatible
+// Helper para fetch con timeout (solo se usa para las APIs externas de BCV)
 async function fetchWithTimeout(resource, options = {}) {
   const { timeout = 15000 } = options;
   const controller = new AbortController();
@@ -1121,162 +1097,175 @@ async function fetchWithTimeout(resource, options = {}) {
   }
 }
 
-// GET — select rows con blindaje
-async function sbGet(tabla, filtros = {}) {
-  try {
-    const uid = currentUser?.id;
-    if (!uid) return [];
-
-    const url = new URL(`${SB_URL}/rest/v1/${tabla}`);
-    url.searchParams.set('select', '*');
-    url.searchParams.set('user_id', `eq.${uid}`); // Filtro de seguridad obligatorio
-
-    Object.entries(filtros).forEach(([k, v]) => {
-      if (k !== 'user_id') url.searchParams.set(k, `eq.${v}`);
-    });
-
-    const hdrs = await getHdrs();
-    const r = await fetchWithTimeout(url.toString(), { headers: hdrs, timeout: 10000 });
-    if (!r.ok) return [];
-    const data = await r.json();
-    return Array.isArray(data) ? data : [];
-  } catch (e) {
-    console.warn(`sbGet ${tabla} fallo:`, e);
-    return [];
-  }
-}
-
-// INSERT
-async function sbInsert(tabla, datos) {
-  const hdrs = await getHdrs();
-  const r = await fetchWithTimeout(`${SB_URL}/rest/v1/${tabla}`, {
-    method: 'POST', headers: hdrs,
-    body: JSON.stringify(datos)
-  });
-  if (!r.ok) { const t = await r.text(); throw new Error(`sbInsert ${tabla}: ${r.status} ${t}`); }
-  const rows = await r.json();
-  return Array.isArray(rows) ? rows[0] : rows;
-}
-
-// UPSERT
-async function sbUpsert(tabla, datos, onConflict = 'id') {
-  const url = new URL(`${SB_URL}/rest/v1/${tabla}`);
-  url.searchParams.set('on_conflict', onConflict);
-  const hdrs = await getHdrs({ 'Prefer': 'return=representation,resolution=merge-duplicates' });
-  const r = await fetchWithTimeout(url.toString(), {
-    method: 'POST', headers: hdrs,
-    body: JSON.stringify(datos)
-  });
-  if (!r.ok) { const t = await r.text(); throw new Error(`sbUpsert ${tabla}: ${r.status} ${t}`); }
-  const rows = await r.json();
-  return Array.isArray(rows) ? rows[0] : rows;
-}
-
-// DELETE — borra por id
-async function sbDelete(tabla, id) {
-  const url = new URL(`${SB_URL}/rest/v1/${tabla}`);
-  url.searchParams.set('id', `eq.${id}`);
-  const hdrs = await getHdrs();
-  const r = await fetchWithTimeout(url.toString(), { method: 'DELETE' });
-  if (!r.ok) { const t = await r.text(); throw new Error(`sbDelete ${tabla}: ${r.status} ${t}`); }
-  return true;
-}
-
-// Compat wrappers — mantienen el mismo contrato que el código que llama a apiGet/apiPost
+// ── GET: usa sb.from() con el cliente oficial ──────────────
 async function apiGet(accion, params = {}) {
-  if (accion === 'init')           return { status: 'ok', data: { ok: true } };
+  const uid = currentUser?.id;
+  if (!uid) return { status: 'err', data: [] };
 
-  // Para estas tablas, el filtro de user_id ya va implícito en sbGet
-  if (accion === 'getTasas')       return { status: 'ok', data: await sbGet('tasas_bcv') };
-  if (accion === 'getSalarios')    return { status: 'ok', data: await sbGet('salarios') };
-  if (accion === 'getGastosFijos') return { status: 'ok', data: await sbGet('gastos_fijos') };
-
-  if (accion === 'getConfig') {
-    const rows = await sbGet('config') || [];
-    const cfg = {};
-    rows.forEach(r => { if(r && r.clave) cfg[r.clave] = r.valor; });
-    return { status: 'ok', data: cfg };
-  }
-
-  if (accion === 'getGastos') {
-    const uid = currentUser?.id;
-    if (!uid) return { status: 'ok', data: [] };
-
-    const url = new URL(`${SB_URL}/rest/v1/gastos`);
-    url.searchParams.set('select', '*');
-    url.searchParams.set('user_id', `eq.${uid}`);
-    url.searchParams.set('order', 'fecha.desc');
-
-    if (params && params.mes) {
-      url.searchParams.set('fecha', `gte.${params.mes}-01`);
-      url.searchParams.append('fecha', `lte.${params.mes}-31`);
+  try {
+    if (accion === 'getTasas') {
+      const { data, error } = await sb.from('tasas_bcv')
+        .select('*')
+        .eq('user_id', uid)
+        .order('fecha', { ascending: false });
+      if (error) throw error;
+      return { status: 'ok', data: data || [] };
     }
 
-    const hdrs = await getHdrs();
-    const r = await fetchWithTimeout(url.toString(), { headers: hdrs });
-    if (!r.ok) return { status: 'ok', data: [] };
-    return { status: 'ok', data: await r.json() };
+    if (accion === 'getSalarios') {
+      const { data, error } = await sb.from('salarios')
+        .select('*')
+        .eq('user_id', uid)
+        .order('fecha', { ascending: false });
+      if (error) throw error;
+      return { status: 'ok', data: data || [] };
+    }
+
+    if (accion === 'getGastosFijos') {
+      const { data, error } = await sb.from('gastos_fijos')
+        .select('*')
+        .eq('user_id', uid)
+        .eq('activo', true);
+      if (error) throw error;
+      return { status: 'ok', data: data || [] };
+    }
+
+    if (accion === 'getConfig') {
+      const { data, error } = await sb.from('config')
+        .select('*')
+        .eq('user_id', uid);
+      if (error) throw error;
+      const cfg = {};
+      (data || []).forEach(r => {
+        // Las claves se guardan como "bcv_<uid>", extraemos solo el prefijo
+        const clave = (r.clave || '').replace('_' + uid, '');
+        cfg[clave] = r.valor;
+      });
+      return { status: 'ok', data: cfg };
+    }
+
+    if (accion === 'getGastos') {
+      let query = sb.from('gastos')
+        .select('*')
+        .eq('user_id', uid)
+        .order('fecha', { ascending: false });
+
+      if (params && params.mes) {
+        query = query
+          .gte('fecha', `${params.mes}-01`)
+          .lte('fecha', `${params.mes}-31`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return { status: 'ok', data: data || [] };
+    }
+
+    return { status: 'err', data: [] };
+  } catch (e) {
+    console.error(`apiGet [${accion}] error:`, e.message || e);
+    return { status: 'err', data: [] };
   }
-  throw new Error('apiGet acción desconocida: ' + accion);
 }
 
+// ── POST/UPSERT/DELETE: usa sb.from() con el cliente oficial ──
 async function apiPost(accion, body = {}) {
   const uid = currentUser?.id;
   if (!uid) throw new Error('No autenticado');
 
+  // ── GUARDAR TASA BCV (upsert por fecha + user_id) ──────
   if (accion === 'saveTasa') {
-    const row = await sbUpsert('tasas_bcv',
-      { fecha: body.fecha, tasa: parseFloat(body.tasa), fuente: body.fuente || 'BCV Oficial', user_id: uid },
-      'fecha,user_id'
-    );
-    return { status: 'ok', data: { saved: true, fecha: row.fecha, tasa: row.tasa } };
+    const { data, error } = await sb.from('tasas_bcv')
+      .upsert(
+        { fecha: body.fecha, tasa: parseFloat(body.tasa), fuente: body.fuente || 'BCV Oficial', user_id: uid },
+        { onConflict: 'fecha,user_id' }
+      )
+      .select()
+      .single();
+    if (error) throw error;
+    return { status: 'ok', data: { saved: true, fecha: data.fecha, tasa: data.tasa } };
   }
+
+  // ── GUARDAR SNAPSHOT SALARIO (insert) ──────────────────
   if (accion === 'saveSalario') {
-    const row = await sbInsert('salarios', {
-      fecha: body.fecha, tasa_dia: +body.tasa_dia,
-      salario_bs: +body.salario_bs, salario_usd: +body.salario_usd,
-      bono1_bs: +body.bono1_bs,   bono1_usd: +body.bono1_usd,
-      bono2_bs: +body.bono2_bs,   bono2_usd: +body.bono2_usd,
-      cesta_usd: +body.cesta_usd, cesta_bs: +body.cesta_bs,
-      ayuda_bs: +body.ayuda_bs,   ayuda_usd: +body.ayuda_usd,
-      total_bs: +body.total_bs,   total_usd: +body.total_usd,
-      notas: body.notas || '', user_id: uid,
-    });
-    return { status: 'ok', data: { saved: true, id: row.id } };
+    const { data, error } = await sb.from('salarios')
+      .insert({
+        fecha: body.fecha, tasa_dia: +body.tasa_dia,
+        salario_bs: +body.salario_bs, salario_usd: +body.salario_usd,
+        bono1_bs: +body.bono1_bs,    bono1_usd: +body.bono1_usd,
+        bono2_bs: +body.bono2_bs,    bono2_usd: +body.bono2_usd,
+        cesta_usd: +body.cesta_usd,  cesta_bs: +body.cesta_bs,
+        ayuda_bs: +body.ayuda_bs,    ayuda_usd: +body.ayuda_usd,
+        total_bs: +body.total_bs,    total_usd: +body.total_usd,
+        notas: body.notas || '', user_id: uid,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return { status: 'ok', data: { saved: true, id: data.id } };
   }
+
+  // ── GUARDAR GASTO VARIABLE (insert) ────────────────────
   if (accion === 'saveGasto') {
-    const row = await sbInsert('gastos', {
-      fecha: body.fecha, descripcion: body.descripcion,
-      categoria: body.categoria || 'Otro',
-      monto_usd: +body.monto_usd, tasa_dia: +body.tasa_dia,
-      monto_bs_dia: +body.monto_bs_dia, tipo: body.tipo || 'variable',
-      user_id: uid,
-    });
-    return { status: 'ok', data: { saved: true, id: row.id } };
+    const { data, error } = await sb.from('gastos')
+      .insert({
+        fecha: body.fecha, descripcion: body.descripcion,
+        categoria: body.categoria || 'Otro',
+        monto_usd: +body.monto_usd, tasa_dia: +body.tasa_dia,
+        monto_bs_dia: +body.monto_bs_dia, tipo: body.tipo || 'variable',
+        user_id: uid,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return { status: 'ok', data: { saved: true, id: data.id } };
   }
+
+  // ── ELIMINAR GASTO ──────────────────────────────────────
   if (accion === 'deleteGasto') {
-    await sbDelete('gastos', body.id);
+    const { error } = await sb.from('gastos')
+      .delete()
+      .eq('id', body.id)
+      .eq('user_id', uid); // seguridad: solo borra los propios
+    if (error) throw error;
     return { status: 'ok', data: { deleted: true, id: body.id } };
   }
+
+  // ── GUARDAR GASTO FIJO (insert) ─────────────────────────
   if (accion === 'saveGastoFijo') {
-    const row = await sbInsert('gastos_fijos', {
-      descripcion: body.descripcion, categoria: body.categoria || 'Hogar',
-      monto_usd: +body.monto_usd, activo: true, user_id: uid,
-    });
-    return { status: 'ok', data: { saved: true, id: row.id } };
+    const { data, error } = await sb.from('gastos_fijos')
+      .insert({
+        descripcion: body.descripcion, categoria: body.categoria || 'Hogar',
+        monto_usd: +body.monto_usd, activo: true, user_id: uid,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return { status: 'ok', data: { saved: true, id: data.id } };
   }
+
+  // ── ELIMINAR GASTO FIJO ─────────────────────────────────
   if (accion === 'deleteGastoFijo') {
-    await sbDelete('gastos_fijos', body.id);
+    const { error } = await sb.from('gastos_fijos')
+      .delete()
+      .eq('id', body.id)
+      .eq('user_id', uid);
+    if (error) throw error;
     return { status: 'ok', data: { deleted: true, id: body.id } };
   }
+
+  // ── GUARDAR CONFIG (upsert por clave) ───────────────────
   if (accion === 'saveConfig') {
-    await sbUpsert('config',
-      { clave: body.clave + '_' + uid, valor: String(body.valor),
-        actualizado_en: new Date().toISOString(), user_id: uid },
-      'clave'
-    );
+    const { error } = await sb.from('config')
+      .upsert(
+        { clave: body.clave + '_' + uid, valor: String(body.valor),
+          actualizado_en: new Date().toISOString(), user_id: uid },
+        { onConflict: 'clave' }
+      );
+    if (error) throw error;
     return { status: 'ok', data: { saved: true } };
   }
+
   throw new Error('apiPost acción desconocida: ' + accion);
 }
 
@@ -1841,26 +1830,18 @@ async function clearG() {
   renderGastos();
   renderAhorro();
 
-  // 2. Borrar en la Nube (Optimizado: una sola petición si es posible o secuencial robusto)
+  // 2. Borrar en la Nube usando el cliente Supabase oficial
   if (idsABorrar.length === 0) return;
 
   setSyncState('loading', 'Borrando en nube...');
   try {
     const uid = currentUser?.id;
-    const url = new URL(`${SB_URL}/rest/v1/gastos`);
-    url.searchParams.set('user_id', `eq.${uid}`);
+    let query = sb.from('gastos').delete().eq('user_id', uid);
     if (mesFiltro) {
-      url.searchParams.set('fecha', `gte.${mesFiltro}-01`);
-      url.searchParams.append('fecha', `lte.${mesFiltro}-31`);
+      query = query.gte('fecha', `${mesFiltro}-01`).lte('fecha', `${mesFiltro}-31`);
     }
-
-    const hdrs = await getHdrs();
-    const r = await fetchWithTimeout(url.toString(), {
-      method: 'DELETE',
-      headers: hdrs
-    });
-
-    if (!r.ok) throw new Error("Error en servidor");
+    const { error } = await query;
+    if (error) throw error;
     setSyncState('ok');
   } catch (err) {
     console.error("Fallo borrado nube:", err);
