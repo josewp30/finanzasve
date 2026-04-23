@@ -1329,7 +1329,7 @@ function updateHdr() {
 // ═══════════════════════════════════════════════════════════
 async function fetchBCV() {
   try {
-    const r = await fetch('https://ve.dolarapi.com/v1/dolares/oficial', { signal: AbortSignal.timeout(10000) });
+    const r = await fetchWithTimeout('https://ve.dolarapi.com/v1/dolares/oficial', { timeout: 10000 });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const d = await r.json();
     const rate = parseFloat(d.promedio || d.venta || d.compra) || null;
@@ -1337,7 +1337,7 @@ async function fetchBCV() {
     return { rate, fecha, fuente: d.nombre || 'BCV Oficial' };
   } catch {
     try {
-      const r2 = await fetch('https://ve.dolarapi.com/v1/dolares', { signal: AbortSignal.timeout(10000) });
+      const r2 = await fetchWithTimeout('https://ve.dolarapi.com/v1/dolares', { timeout: 10000 });
       const arr = await r2.json();
       const of = arr.find(x => (x.nombre || '').toLowerCase().includes('oficial'));
       if (of) {
@@ -1355,7 +1355,7 @@ async function fetchBCV() {
 // Buscar tasa histórica por fecha en la API
 async function fetchTasaHistoricaAPI(fecha) {
   try {
-    const r = await fetch('https://ve.dolarapi.com/v1/historicos/dolares/oficial', { signal: AbortSignal.timeout(12000) });
+    const r = await fetchWithTimeout('https://ve.dolarapi.com/v1/historicos/dolares/oficial', { timeout: 12000 });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const arr = await r.json();
     // arr: [{fecha, promedio, compra, venta, fuente}, ...]
