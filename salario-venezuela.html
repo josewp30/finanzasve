@@ -863,8 +863,8 @@ async function initApp() {
   if (isInitializing) return;
   isInitializing = true;
 
+  // 1. CARGA LOCAL INMEDIATA (Para velocidad total)
   try {
-    // 1. Cargar datos locales inmediatamente
     const uid = currentUser?.id || 'anon';
     const LS_KEY_USER = 'fve4_' + uid;
     const d = localStorage.getItem(LS_KEY_USER) || localStorage.getItem(LS_KEY);
@@ -874,37 +874,65 @@ async function initApp() {
       if (parsed) S = { ...S, ...parsed };
     }
 
-    // Sanitizar
+    // Sanitizar y asegurar arrays
     ['gastos','gastosFijos','tasasHistoricas','salarios'].forEach(k => { if(!Array.isArray(S[k])) S[k]=[]; });
 
-    // Render inicial
-    updateHdr(); liveCalc();
-    renderResumen(); renderSemanal(); renderGastos(); renderGastosFijos();
-    hideLoading();
-  } catch(e) { console.error("Error local load:", e); hideLoading(); }
+    // Poblar Inputs para que liveCalc funcione
+    const setV = (id, v) => { const e = document.getElementById(id); if (e) e.value = v || ''; };
+    const hoy = new Date().toISOString().split('T')[0];
+    setV('g-f', hoy); setV('inp-dt', hoy); setV('m-dt', hoy); setV('ht-fecha', hoy);
+    setV('g-mes-filtro', hoy.slice(0, 7));
 
-  // 2. Sincronizar con Supabase en segundo plano
-  setSyncState('loading');
+    if (S.bcv) setV('inp-bcv', S.bcv);
+    if (S.salario) setV('inp-sal', S.salario);
+    if (S.b1) setV('inp-b1', S.b1);
+    if (S.b2) setV('inp-b2', S.b2);
+    if (S.cusd) setV('inp-cu', S.cusd);
+
+    // Render inicial ultra-rápido
+    updateHdr();
+    liveCalc();
+    renderResumen();
+    renderSemanal();
+    renderGastos();
+    renderGastosFijos();
+    hideLoading(); // Quitar splash screen YA
+  } catch(e) {
+    console.error("Error fast load:", e);
+    hideLoading();
+  }
+
+  // 2. SINCRONIZACIÓN EN SEGUNDO PLANO (Nube)
+  setSyncState('loading', 'Sincronizando...');
   try {
     const [resTasas, resFijos, resCfg, resGastos, resSal] = await Promise.all([
-      apiGet('getTasas').catch(e => ({status:'err'})),
-      apiGet('getGastosFijos').catch(e => ({status:'err'})),
-      apiGet('getConfig').catch(e => ({status:'err'})),
-      apiGet('getGastos').catch(e => ({status:'err'})),
-      apiGet('getSalarios').catch(e => ({status:'err'}))
+      apiGet('getTasas').catch(() => ({status:'err'})),
+      apiGet('getGastosFijos').catch(() => ({status:'err'})),
+      apiGet('getConfig').catch(() => ({status:'err'})),
+      apiGet('getGastos').catch(() => ({status:'err'})),
+      apiGet('getSalarios').catch(() => ({status:'err'}))
     ]);
 
     if (resTasas.status === 'ok') S.tasasHistoricas = resTasas.data.sort((a,b) => b.fecha.localeCompare(a.fecha));
     if (resFijos.status === 'ok') S.gastosFijos = resFijos.data;
-    if (resCfg.status === 'ok' && resCfg.data.bcv) { S.bcv = parseFloat(resCfg.data.bcv); S.bcvDate = resCfg.data.bcvDate; }
+    if (resCfg.status === 'ok' && resCfg.data) {
+      if (resCfg.data.bcv) S.bcv = parseFloat(resCfg.data.bcv);
+      if (resCfg.data.bcvDate) S.bcvDate = resCfg.data.bcvDate;
+    }
     if (resGastos.status === 'ok') S.gastos = resGastos.data;
     if (resSal.status === 'ok') S.salarios = resSal.data;
 
-    lsSave(); updateHdr(); liveCalc();
-    renderResumen(); renderSemanal(); renderAhorro(); renderGastos(); renderGastosFijos();
+    // Guardar lo nuevo y refrescar UI sin bloquear al usuario
+    lsSave();
+    updateHdr();
+    liveCalc();
+    renderResumen();
+    renderSemanal();
+    renderAhorro();
+    renderGastos();
+    renderGastosFijos();
     setSyncState('ok');
   } catch (err) {
-    console.warn("Fallo sincronización nube:", err);
     setSyncState('err', 'Modo local');
   } finally {
     isInitializing = false;
@@ -1795,28 +1823,49 @@ async function delGasto(id) {
 
 async function clearG() {
   const mesFiltro = document.getElementById('g-mes-filtro').value || '';
-  const label = mesFiltro ? `del mes ${mesFiltro}` : 'de todos los meses';
-  if (!confirm(`¿Borrar TODOS los gastos ${label}? Esto también los borrará de Google Sheets.`)) return;
+  const label = mesFiltro ? `del mes ${mesFiltro}` : 'de TODOS los periodos';
+  if (!confirm(`¿Borrar gastos ${label}? Esta acción no se puede deshacer.`)) return;
 
-  // Qué gastos vamos a borrar
+  // 1. Identificar y Borrar localmente (Feedback instantáneo)
   const aBorrar = mesFiltro
     ? S.gastos.filter(g => String(g.fecha || '').startsWith(mesFiltro))
     : [...S.gastos];
-  const idsABorrar = new Set(aBorrar.map(g => g.id));
 
-  // Borrar local
-  S.gastos = S.gastos.filter(g => !idsABorrar.has(g.id));
-  lsSave(); renderGastos(); renderAhorro();
+  const idsABorrar = aBorrar.map(g => g.id).filter(id => !id.startsWith('gto_')); // solo IDs de la nube
 
-  // Borrar en Sheets — uno por uno
-  setSyncState('loading', 'Borrando en Sheets...');
-  let errores = 0;
-  for (const g of aBorrar) {
-    try { await apiPost('deleteGasto', { id: g.id }); }
-    catch { errores++; }
+  S.gastos = mesFiltro
+    ? S.gastos.filter(g => !String(g.fecha || '').startsWith(mesFiltro))
+    : [];
+
+  lsSave();
+  renderGastos();
+  renderAhorro();
+
+  // 2. Borrar en la Nube (Optimizado: una sola petición si es posible o secuencial robusto)
+  if (idsABorrar.length === 0) return;
+
+  setSyncState('loading', 'Borrando en nube...');
+  try {
+    const uid = currentUser?.id;
+    const url = new URL(`${SB_URL}/rest/v1/gastos`);
+    url.searchParams.set('user_id', `eq.${uid}`);
+    if (mesFiltro) {
+      url.searchParams.set('fecha', `gte.${mesFiltro}-01`);
+      url.searchParams.append('fecha', `lte.${mesFiltro}-31`);
+    }
+
+    const hdrs = await getHdrs();
+    const r = await fetchWithTimeout(url.toString(), {
+      method: 'DELETE',
+      headers: hdrs
+    });
+
+    if (!r.ok) throw new Error("Error en servidor");
+    setSyncState('ok');
+  } catch (err) {
+    console.error("Fallo borrado nube:", err);
+    setSyncState('err', 'Error al borrar en nube');
   }
-  setSyncState(errores === 0 ? 'ok' : 'err',
-    errores > 0 ? `${errores} gastos no se borraron de Sheets` : undefined);
 }
 
 async function cargarGastosMes() {
