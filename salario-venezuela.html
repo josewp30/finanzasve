@@ -799,7 +799,7 @@ const SB_URL = 'https://tdcpdjhwvpkrxgmnpftv.supabase.co';
 // ⚠️ IMPORTANTE: Reemplaza esto con tu anon key real de Supabase.
 // Encuéntrala en: supabase.com → tu proyecto → Settings → API → "anon public"
 // Debe empezar con "eyJ..." (es un JWT largo)
-const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkY3Bkamh3dnBrcnhnbW5wZnR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNTUwMzEsImV4cCI6MjA4ODkzMTAzMX0.YqdHUV2O0ELXd1wJJTzTRvNUA06G6F2xlLJ33T9lMD8';
+const SB_KEY = 'TU_ANON_KEY_AQUI_eyJ...';
 const sb = supabase.createClient(SB_URL, SB_KEY, {
   auth: {
     autoRefreshToken: true,
@@ -913,7 +913,39 @@ async function initApp() {
       if (resCfg.data.bcvDate) S.bcvDate = resCfg.data.bcvDate;
     }
     if (resGastos.status === 'ok') S.gastos = resGastos.data;
-    if (resSal.status === 'ok') S.salarios = resSal.data;
+    if (resSal.status === 'ok') {
+      S.salarios = resSal.data.sort((a,b) => String(b.fecha||'').localeCompare(String(a.fecha||'')));
+
+      // ── CLAVE: poblar S con el snapshot salarial más reciente ──
+      // El salario configurado vive en la tabla `salarios`, no en `config`.
+      const ultimo = S.salarios[0];
+      if (ultimo) {
+        // Siempre usar el último snapshot de la nube — es la fuente de verdad
+        S.salario = parseFloat(ultimo.salario_bs)  || S.salario || 0;
+        S.b1      = parseFloat(ultimo.bono1_bs)    || S.b1     || 0;
+        S.b2      = parseFloat(ultimo.bono2_bs)    || S.b2     || 0;
+        S.cusd    = parseFloat(ultimo.cesta_usd)   || S.cusd   || 0;
+        if (ultimo.tasa_dia && (!S.bcv || S.bcv === 0)) {
+          S.bcv     = parseFloat(ultimo.tasa_dia) || 0;
+          S.bcvDate = ultimo.fecha || '';
+        }
+      }
+    }
+
+    // Tasa activa: la más reciente del historial tiene prioridad sobre todo
+    if (S.tasasHistoricas.length > 0 && S.tasasHistoricas[0].tasa) {
+      S.bcv     = parseFloat(S.tasasHistoricas[0].tasa);
+      S.bcvDate = S.tasasHistoricas[0].fecha;
+    }
+
+    // Repoblar inputs con valores reales de la nube
+    const setVcloud = (id, v) => { const e = document.getElementById(id); if (e && v) e.value = v; };
+    if (S.bcv)     setVcloud('inp-bcv', S.bcv);
+    if (S.bcvDate) setVcloud('inp-dt',  S.bcvDate);
+    if (S.salario) setVcloud('inp-sal', S.salario);
+    if (S.b1)      setVcloud('inp-b1',  S.b1);
+    if (S.b2)      setVcloud('inp-b2',  S.b2);
+    if (S.cusd)    setVcloud('inp-cu',  S.cusd);
 
     // Guardar lo nuevo y refrescar UI sin bloquear al usuario
     lsSave();
