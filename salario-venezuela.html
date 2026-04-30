@@ -1858,12 +1858,20 @@
       setSyncState('loading', 'Sincronizando...');
       try {
         const [resTasas, resFijos, resCfg, resGastos, resSal] = await Promise.all([
-          apiGet('getTasas').catch(() => ({ status: 'err' })),
-          apiGet('getGastosFijos').catch(() => ({ status: 'err' })),
-          apiGet('getConfig').catch(() => ({ status: 'err' })),
-          apiGet('getGastos').catch(() => ({ status: 'err' })),
-          apiGet('getSalarios').catch(() => ({ status: 'err' }))
+          apiGet('getTasas').catch(e => { console.error('getTasas err:', e); return { status: 'err' }; }),
+          apiGet('getGastosFijos').catch(e => { console.error('getGastosFijos err:', e); return { status: 'err' }; }),
+          apiGet('getConfig').catch(e => { console.error('getConfig err:', e); return { status: 'err' }; }),
+          apiGet('getGastos').catch(e => { console.error('getGastos err:', e); return { status: 'err' }; }),
+          apiGet('getSalarios').catch(e => { console.error('getSalarios err:', e); return { status: 'err' }; })
         ]);
+        console.log("=== DB SYNC RESULTS ===");
+        console.log("Tasas:", resTasas);
+        console.log("Fijos:", resFijos);
+        console.log("Config:", resCfg);
+        console.log("Gastos:", resGastos);
+        console.log("Salarios:", resSal);
+        console.log("CurrentUser ID:", currentUser?.id);
+        console.log("=======================");
 
         if (resTasas.status === 'ok') S.tasasHistoricas = resTasas.data.sort((a, b) => b.fecha.localeCompare(a.fecha));
         if (resFijos.status === 'ok') {
