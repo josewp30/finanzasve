@@ -868,7 +868,7 @@ async function initApp() {
     }
 
     // Sanitizar y asegurar arrays
-    ['gastos','gastosFijos','tasasHistoricas','salarios'].forEach(k => { if(!Array.isArray(S[k])) S[k]=[]; });
+    ['gastos','gastosFijos','tasasHistoricas','salarios','deletedGastos','deletedFijos'].forEach(k => { if(!Array.isArray(S[k])) S[k]=[]; });
 
     // Poblar Inputs para que liveCalc funcione
     const setV = (id, v) => { const e = document.getElementById(id); if (e) e.value = v || ''; };
@@ -907,19 +907,45 @@ async function initApp() {
     ]);
 
     if (resTasas.status === 'ok') S.tasasHistoricas = resTasas.data.sort((a,b) => b.fecha.localeCompare(a.fecha));
-    if (resFijos.status === 'ok') S.gastosFijos = resFijos.data;
+    if (resFijos.status === 'ok') {
+      if (S.deletedFijos && S.deletedFijos.length > 0) {
+        resFijos.data = resFijos.data.filter(g => !S.deletedFijos.includes(g.id));
+        S.deletedFijos.forEach(id => apiPost('deleteGastoFijo', { id }));
+        S.deletedFijos = [];
+      }
+      const localUnsynced = S.gastosFijos.filter(g => String(g.id).startsWith('fjo_'));
+      S.gastosFijos = [...resFijos.data, ...localUnsynced];
+      localUnsynced.forEach(g => {
+        apiPost('saveGastoFijo', g).then(r => {
+          if (r.status === 'ok') { g.id = r.data.id; lsSave(); }
+        });
+      });
+    }
     if (resCfg.status === 'ok' && resCfg.data) {
       if (resCfg.data.bcv) S.bcv = parseFloat(resCfg.data.bcv);
       if (resCfg.data.bcvDate) S.bcvDate = resCfg.data.bcvDate;
     }
-    if (resGastos.status === 'ok') S.gastos = resGastos.data;
+    if (resGastos.status === 'ok') {
+      if (S.deletedGastos && S.deletedGastos.length > 0) {
+        resGastos.data = resGastos.data.filter(g => !S.deletedGastos.includes(g.id));
+        S.deletedGastos.forEach(id => apiPost('deleteGasto', { id }));
+        S.deletedGastos = [];
+      }
+      const localUnsynced = S.gastos.filter(g => String(g.id).startsWith('gto_'));
+      S.gastos = [...resGastos.data, ...localUnsynced];
+      localUnsynced.forEach(g => {
+        apiPost('saveGasto', g).then(r => {
+          if (r.status === 'ok') { g.id = r.data.id; lsSave(); }
+        });
+      });
+    }
     if (resSal.status === 'ok') {
       S.salarios = resSal.data.sort((a,b) => String(b.fecha||'').localeCompare(String(a.fecha||'')));
 
       // ── CLAVE: poblar S con el snapshot salarial más reciente ──
       // El salario configurado vive en la tabla `salarios`, no en `config`.
       const ultimo = S.salarios[0];
-      if (ultimo) {
+      if (ultimo && !S.configUnsynced) {
         // Siempre usar el último snapshot de la nube — es la fuente de verdad
         S.salario = parseFloat(ultimo.salario_bs)  || S.salario || 0;
         S.b1      = parseFloat(ultimo.bono1_bs)    || S.b1     || 0;
@@ -929,6 +955,9 @@ async function initApp() {
           S.bcv     = parseFloat(ultimo.tasa_dia) || 0;
           S.bcvDate = ultimo.fecha || '';
         }
+      } else if (S.configUnsynced) {
+        // Try to sync now if we are online
+        calcularTodo(true);
       }
     }
 
@@ -1465,13 +1494,13 @@ function liveCalc() {
 // ═══════════════════════════════════════════════════════════
 //  CALCULAR TODO + GUARDAR SNAPSHOT SALARIO
 // ═══════════════════════════════════════════════════════════
-async function calcularTodo() {
+async function calcularTodo(isBackground = false) {
   S.bcv = parseFloat(document.getElementById('inp-bcv').value) || S.bcv;
   S.bcvDate = document.getElementById('inp-dt').value || S.bcvDate;
-  S.salario = parseFloat(document.getElementById('inp-sal').value) || 0;
-  S.b1 = parseFloat(document.getElementById('inp-b1').value) || 0;
-  S.b2 = parseFloat(document.getElementById('inp-b2').value) || 0;
-  S.cusd = parseFloat(document.getElementById('inp-cu').value) || 0;
+  S.salario = parseFloat(document.getElementById('inp-sal').value) || S.salario || 0;
+  S.b1 = parseFloat(document.getElementById('inp-b1').value) || S.b1 || 0;
+  S.b2 = parseFloat(document.getElementById('inp-b2').value) || S.b2 || 0;
+  S.cusd = parseFloat(document.getElementById('inp-cu').value) || S.cusd || 0;
   const notas = document.getElementById('inp-notas').value.trim();
   lsSave(); updateHdr();
 
@@ -1480,7 +1509,7 @@ async function calcularTodo() {
   const totalBs = sal + b1 + b2 + cbs + ay;
   const totalUSD = usdFromBs(totalBs, bcv);
 
-  showStatus('cfg-status', 'loading', '⟳ Guardando en Google Sheets...');
+  if (!isBackground) showStatus('cfg-status', 'loading', '⟳ Guardando en Google Sheets...');
   setSyncState('loading', 'Guardando...');
   try {
     await apiPost('saveSalario', {
@@ -1495,15 +1524,21 @@ async function calcularTodo() {
       notas,
     });
     await apiPost('saveTasa', { fecha: S.bcvDate, tasa: bcv, fuente: 'BCV Oficial' });
-    showStatus('cfg-status', 'ok', `✓ Guardado en Sheets · Total: ${fUSD(totalUSD)} / ${fBs(totalBs)}`);
+    if (!isBackground) showStatus('cfg-status', 'ok', `✓ Guardado en Sheets · Total: ${fUSD(totalUSD)} / ${fBs(totalBs)}`);
     setSyncState('ok');
+    S.configUnsynced = false;
+    lsSave();
   } catch {
-    showStatus('cfg-status', 'warn', '⚠ Guardado local solamente. Sin conexión.');
+    if (!isBackground) showStatus('cfg-status', 'warn', '⚠ Guardado local solamente. Sin conexión.');
     setSyncState('err', 'Sin conexión');
+    S.configUnsynced = true;
+    lsSave();
   }
 
-  renderResumen(); renderSemanal(); renderAhorro(); renderGastos();
-  nav(document.querySelectorAll('.nav-btn')[1], 'resumen');
+  if (!isBackground) {
+    renderResumen(); renderSemanal(); renderAhorro(); renderGastos();
+    nav(document.querySelectorAll('.nav-btn')[1], 'resumen');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1825,7 +1860,12 @@ function showGastoSyncStatus(type, msg) {
 async function delGasto(id) {
   if (!confirm('¿Borrar este gasto?')) return;
   // Borrar local primero
-  S.gastos = S.gastos.filter(g => g.id !== id); lsSave();
+  S.gastos = S.gastos.filter(g => g.id !== id);
+  if (!String(id).startsWith('gto_')) {
+    S.deletedGastos = S.deletedGastos || [];
+    S.deletedGastos.push(id);
+  }
+  lsSave();
   renderGastos(); renderAhorro();
   // Borrar en Sheets
   setSyncState('loading', 'Borrando...');
@@ -1992,7 +2032,12 @@ async function addGastoFijo() {
 
 async function delGastoFijo(id) {
   if (!confirm('¿Borrar este gasto fijo?')) return;
-  S.gastosFijos = S.gastosFijos.filter(g => g.id !== id); lsSave();
+  S.gastosFijos = S.gastosFijos.filter(g => g.id !== id);
+  if (!String(id).startsWith('fjo_')) {
+    S.deletedFijos = S.deletedFijos || [];
+    S.deletedFijos.push(id);
+  }
+  lsSave();
   renderGastosFijos(); renderAhorro();
   setSyncState('loading', 'Borrando...');
   try {
@@ -2521,9 +2566,12 @@ function hideLoading() {
   if (forceBtnTimer) clearTimeout(forceBtnTimer);
 }
 
-// window.onload — solo lanza el listener de auth
+// Ejecutar listener de auth de inmediato para capturar redirect de Supabase
+onAuthStateChange();
+
+// window.onload para lógica adicional si es necesaria
 window.onload = () => {
-  onAuthStateChange();
+  // Ya no se llama aquí onAuthStateChange()
 };
 
 // ═══════════════════════════════════════════════════════════
