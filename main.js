@@ -31,22 +31,7 @@
       return data;
     }
 
-    async function signInGoogle() {
-      // Limpiar URL para el redirect
-      const base = window.location.origin + window.location.pathname;
 
-      const { error } = await sb.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: base,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          }
-        }
-      });
-      if (error) throw new Error(error.message);
-    }
 
     async function signOut() {
       localStorage.removeItem(LS_KEY);
@@ -251,30 +236,7 @@
       btn.disabled = false; btn.textContent = 'Crear cuenta';
     }
 
-    async function handleGoogleSignIn() {
-      const btn = document.getElementById('auth-btn-google');
-      const originalHtml = btn.innerHTML;
 
-      btn.disabled = true;
-      btn.textContent = '⟳ Conectando con Google...';
-
-      // Timeout por si Google/Supabase no responden rápido
-      const authTimeout = setTimeout(() => {
-        btn.disabled = false;
-        btn.innerHTML = originalHtml;
-        showAuthErr("La conexión tardó demasiado. Intenta de nuevo.");
-      }, 15000);
-
-      try {
-        await signInGoogle();
-        // Si la redirección tiene éxito, el navegador cambiará de página y el timeout se limpiará solo
-      } catch (e) {
-        clearTimeout(authTimeout);
-        showAuthErr(e.message);
-        btn.disabled = false;
-        btn.innerHTML = originalHtml;
-      }
-    }
 
     function showAuthErr(msg, type = 'error') {
       const el = document.getElementById('auth-err');

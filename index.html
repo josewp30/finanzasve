@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FinanzasVE">
+  <meta name="theme-color" content="#0b1120">
+  <title>FinanzasVE v4.1.2</title>
+
+  <!-- PWA Manifest -->
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Apple touch icon inline SVG → PNG via canvas -->
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+
+  <link
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <!-- LOADING -->
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="spinner"></div>
+    <div style="font-size:.85rem;color:var(--text2);margin-top:1rem;" id="loading-msg">Conectando...</div>
+    <!-- Botón de emergencia si tarda más de 5s -->
+    <button id="btn-force-close" onclick="hideLoading()"
+      style="margin-top:2rem;background:transparent;border:1px solid var(--border);color:var(--text2);padding:.5rem 1rem;border-radius:20px;font-size:.7rem;cursor:pointer;display:none;z-index:9999;">✕
+      Cancelar espera</button>
+  </div>
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="logo">FINANZAS<span>VE</span></div>
+
+    <!-- BCV pill centrado -->
+    <div class="bcv-pill" onclick="openModal('modal-bcv')" title="Gestionar tasa BCV">
+      <div class="pulse"></div>
+      <span class="lbl">BCV</span>
+      <span class="rate" id="hdr-rate">— Bs./$</span>
+    </div>
+
+    <div class="topbar-right">
+      <!-- Sync dot -->
+      <div class="sync-indicator" id="sync-indicator">
+        <div class="sync-dot" id="sync-dot"></div>
+      </div>
+
+      <!-- Instalar PWA -->
+      <button id="pwa-install-btn" onclick="installPWA()"
+        style="display:none;align-items:center;gap:.35rem;padding:.3rem .7rem;border-radius:16px;border:1px solid rgba(200,168,75,.3);background:rgba(200,168,75,.08);color:var(--gold2);font-family:'IBM Plex Sans',sans-serif;font-size:.72rem;font-weight:600;cursor:pointer;">
+        ↓ Instalar
+      </button>
+
+      <!-- Avatar + dropdown estilo red social -->
+      <div class="user-menu" id="user-info" style="display:none;">
+        <div class="avatar-btn" id="user-avatar" onclick="toggleUserMenu()"></div>
+        <div class="user-dropdown" id="user-dropdown">
+          <div class="ud-header">
+            <div class="ud-name" id="user-display-name"></div>
+            <div class="ud-email" id="user-email-lbl"></div>
+          </div>
+          <button class="ud-item" onclick="installPWA();toggleUserMenu()">↓ Instalar app</button>
+          <button class="ud-item danger" onclick="signOut()">← Cerrar sesión</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Banner actualización SW -->
+  <div class="update-banner" id="update-banner">
+    <span>🆕 Nueva versión disponible</span>
+    <button onclick="applyUpdate()"
+      style="padding:.35rem .9rem;border-radius:8px;border:none;background:var(--teal);color:#0b1120;font-family:'IBM Plex Sans',sans-serif;font-size:.8rem;font-weight:700;cursor:pointer;">Actualizar</button>
+    <button onclick="document.getElementById('update-banner').classList.remove('show')"
+      style="padding:.35rem .6rem;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'IBM Plex Sans',sans-serif;font-size:.8rem;cursor:pointer;">Luego</button>
+  </div>
+
+  <div id="main-app" style="display:none;flex-direction:column;">
+    <div class="layout">
+      <nav class="sidebar">
+        <div class="nav-sec">Principal</div>
+        <button class="nav-btn active" onclick="nav(this,'resumen')"><span class="ic">◈</span><span
+            class="nav-lbl">Resumen</span></button>
+        <div class="nav-sec">Pagos</div>
+        <button class="nav-btn" onclick="nav(this,'semanal')"><span class="ic">▦</span><span
+            class="nav-lbl">Calendario</span></button>
+        <div class="nav-sec">Análisis</div>
+        <button class="nav-btn" onclick="nav(this,'gastos')"><span class="ic">↓</span><span
+            class="nav-lbl">Gastos</span></button>
+        <button class="nav-btn" onclick="nav(this,'fijos')"><span class="ic">📌</span><span
+            class="nav-lbl">Fijos</span></button>
+        <button class="nav-btn" onclick="nav(this,'ahorro')"><span class="ic">◎</span><span
+            class="nav-lbl">Ahorro</span></button>
+        <div class="nav-sec">Histórico</div>
+        <button class="nav-btn" onclick="nav(this,'htasas')"><span class="ic">📈</span><span
+            class="nav-lbl">Tasas</span></button>
+        <button class="nav-btn" onclick="nav(this,'hsalarios')"><span class="ic">💼</span><span
+            class="nav-lbl">Salarios</span></button>
+        <div class="nav-sec">Ajustes</div>
+        <button class="nav-btn" onclick="nav(this,'config')"><span class="ic">⚙</span><span
+            class="nav-lbl">Configuración</span></button>
+      </nav>
+
+      <main class="content">
+
+        <!-- ═══════════════════════════════════════════════
+         CONFIG
+    ════════════════════════════════════════════════ -->
+        <div class="page" id="page-config">
+          <div class="pg-title">Configuración de Ingresos</div>
+          <div class="pg-sub">Define tu estructura salarial. Al guardar, se registra un snapshot con la tasa BCV del
+            día.</div>
+
+          <div class="g2">
+            <div class="card">
+              <div class="card-lbl">Tasa BCV Activa</div>
+              <div class="fld"><label>Bs. por 1 USD</label>
+                <input type="number" id="inp-bcv" placeholder="Ej: 98.50" step="0.01" oninput="liveCalc()">
+              </div>
+              <div class="fld"><label>Fecha valor</label><input type="date" id="inp-dt"></div>
+              <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+                <button class="btn btn-t" onclick="fetchAction(false)">⟳ Obtener tasa BCV</button>
+                <button class="btn btn-p" onclick="saveBCV()">✓ Guardar tasa</button>
+              </div>
+              <div id="cfg-status"
+                style="display:none;margin-top:.9rem;font-size:.8rem;padding:.7rem 1rem;border-radius:8px;"></div>
+            </div>
+
+            <div class="card">
+              <div class="card-lbl">Salario Mensual</div>
+              <div class="fld"><label>Salario total (Bs.)</label>
+                <input type="number" id="inp-sal" placeholder="0.00" step="0.01" oninput="liveCalc()">
+              </div>
+              <div class="calc-row">
+                <div class="cc">
+                  <div class="cl">1ª Quincena · día 10</div>
+                  <div class="cv" id="c-q1">— Bs.</div>
+                  <div class="cu" id="c-q1u">—</div>
+                </div>
+                <div class="cc">
+                  <div class="cl">2ª Quincena · día 25</div>
+                  <div class="cv" id="c-q2">— Bs.</div>
+                  <div class="cu" id="c-q2u">—</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-lbl">Bonos</div>
+              <div class="fld"><label>Bono 1 — pago mensual (Bs.)</label>
+                <input type="number" id="inp-b1" placeholder="0.00" step="0.01" oninput="liveCalc()">
+              </div>
+              <div class="fld"><label>Bono 2 — total mensual (Bs.)</label>
+                <input type="number" id="inp-b2" placeholder="0.00" step="0.01" oninput="liveCalc()">
+              </div>
+              <div class="calc-row">
+                <div class="cc">
+                  <div class="cl">Bono 2 · parte 1</div>
+                  <div class="cv" id="c-b2a">— Bs.</div>
+                  <div class="cu" id="c-b2au">—</div>
+                </div>
+                <div class="cc">
+                  <div class="cl">Bono 2 · parte 2</div>
+                  <div class="cv" id="c-b2b">— Bs.</div>
+                  <div class="cu" id="c-b2bu">—</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-lbl">Cesta Ticket & Ayuda</div>
+              <div class="fld"><label>Cesta Ticket (USD) — pagada en Bs.</label>
+                <input type="number" id="inp-cu" placeholder="0.00" step="0.01" oninput="liveCalc()">
+              </div>
+              <div class="calc-row">
+                <div class="cc">
+                  <div class="cl">Cesta en Bs.</div>
+                  <div class="cv" id="c-cbs">— Bs.</div>
+                  <div class="cu" id="c-cusd">—</div>
+                </div>
+                <div class="cc">
+                  <div class="cl">Ayuda 65%</div>
+                  <div class="cv" id="c-ay">— Bs.</div>
+                  <div class="cu" id="c-ayu">—</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-lbl">Notas del período</div>
+            <div class="fld" style="margin:0;">
+              <textarea id="inp-notas" placeholder="Ej: Aumento de sueldo, cambio de contrato..." rows="2"
+                style="resize:vertical;"></textarea>
+            </div>
+          </div>
+
+          <button class="btn btn-p" onclick="calcularTodo()" style="padding:.75rem 2.2rem;font-size:.92rem;">
+            Calcular y Guardar →
+          </button>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════
+         RESUMEN
+    ════════════════════════════════════════════════ -->
+        <div class="page active" id="page-resumen">
+          <div class="pg-title">Resumen Mensual</div>
+          <div class="pg-sub">Consolidado de ingresos. <span style="color:var(--teal);">USD primario</span> · <span
+              style="color:var(--gold2);">Bs. referencia</span></div>
+          <!-- Selector de tasa histórica -->
+          <div class="card" style="margin-bottom:1rem;">
+            <div class="card-lbl">Vista histórica — elegir tasa</div>
+            <div style="display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;">
+              <select id="sel-tasa-hist" style="max-width:280px;" onchange="aplicarTasaHistorica()">
+                <option value="">Tasa activa (hoy)</option>
+              </select>
+              <span class="xs muted" id="sel-tasa-info"></span>
+            </div>
+          </div>
+          <div class="g4" id="kpi-grid" style="margin-bottom:1.2rem;"></div>
+          <div class="card">
+            <div class="card-lbl">Desglose de Conceptos</div>
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Concepto</th>
+                  <th class="right">USD</th>
+                  <th class="right">Bs. (tasa selec.)</th>
+                  <th class="right">Día / Semana</th>
+                </tr>
+              </thead>
+              <tbody id="tbl-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════
+         SEMANAL
+    ════════════════════════════════════════════════ -->
+        <div class="page" id="page-semanal">
+          <div class="pg-title">Calendario de Pagos</div>
+          <div class="pg-sub">Distribución semanal de ingresos. USD primario · Bs. referencia.</div>
+          <div id="week-blocks"></div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════
+         GASTOS VARIABLES
+    ════════════════════════════════════════════════ -->
+        <div class="page" id="page-gastos">
+          <div class="pg-title">Registro de Gastos</div>
+          <div class="pg-sub">Los gastos en USD se anclan a la tasa BCV del día de registro. Los USD son inmutables.
+          </div>
+          <div class="g2">
+            <div class="card">
+              <div class="card-lbl">Nuevo Gasto</div>
+              <div class="fld"><label>Descripción</label>
+                <input type="text" id="g-desc" placeholder="Almuerzo, Transporte...">
+              </div>
+              <!-- Currency toggle -->
+              <div class="fld">
+                <label>Moneda de ingreso</label>
+                <div
+                  style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:.7rem;">
+                  <button id="g-cur-usd" onclick="setCur('usd')"
+                    style="flex:1;padding:.55rem;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;background:var(--teal);color:#0b1120;transition:all .15s;">$
+                    USD</button>
+                  <button id="g-cur-bs" onclick="setCur('bs')"
+                    style="flex:1;padding:.55rem;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;background:var(--navy3);color:var(--text2);transition:all .15s;">Bs.</button>
+                </div>
+                <div id="g-inp-usd-wrap">
+                  <div style="position:relative;">
+                    <span
+                      style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--teal);font-family:'IBM Plex Mono',monospace;font-size:.85rem;font-weight:600;">$</span>
+                    <input type="number" id="g-m-usd" placeholder="0.00" step="0.01" oninput="syncCurrency('usd')"
+                      style="padding-left:1.8rem;">
+                  </div>
+                  <div id="g-conv-bs"
+                    style="margin-top:.4rem;font-size:.75rem;color:var(--text2);font-family:'IBM Plex Mono',monospace;">
+                    ≈ — Bs. (tasa del día)</div>
+                </div>
+                <div id="g-inp-bs-wrap" style="display:none;">
+                  <div style="position:relative;">
+                    <span
+                      style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--gold2);font-family:'IBM Plex Mono',monospace;font-size:.75rem;font-weight:600;">Bs.</span>
+                    <input type="number" id="g-m-bs" placeholder="0.00" step="0.01" oninput="syncCurrency('bs')"
+                      style="padding-left:2.5rem;">
+                  </div>
+                  <div id="g-conv-usd"
+                    style="margin-top:.4rem;font-size:.75rem;color:var(--text2);font-family:'IBM Plex Mono',monospace;">
+                    ≈ — USD</div>
+                </div>
+              </div>
+              <div class="g2" style="gap:.7rem;">
+                <div class="fld" style="margin:0;"><label>Fecha</label>
+                  <input type="date" id="g-f" onchange="onFechaGastoChange()">
+                </div>
+                <div class="fld" style="margin:0;"><label>Categoría</label>
+                  <select id="g-c">
+                    <option>Alimentación</option>
+                    <option>Transporte</option>
+                    <option>Servicios</option>
+                    <option>Salud</option>
+                    <option>Educación</option>
+                    <option>Entretenimiento</option>
+                    <option>Ropa</option>
+                    <option>Hogar</option>
+                    <option>Otro</option>
+                  </select>
+                </div>
+              </div>
+              <!-- Tasa del día — se actualiza al cambiar fecha -->
+              <div id="g-tasa-box" style="margin-top:.7rem;border-radius:8px;padding:.6rem .85rem;display:none;">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem;">
+                  <div>
+                    <div id="g-tasa-lbl"
+                      style="font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin-bottom:.2rem;">
+                    </div>
+                    <div id="g-tasa-val" style="font-family:'IBM Plex Mono',monospace;font-size:.9rem;font-weight:500;">
+                    </div>
+                  </div>
+                  <div id="g-tasa-manual-wrap" style="display:none;">
+                    <div style="display:flex;gap:.4rem;align-items:center;">
+                      <input type="number" id="g-tasa-manual" placeholder="Bs./USD" step="0.01"
+                        style="width:110px;padding:.4rem .6rem;font-size:.8rem;" oninput="onTasaManualInput()">
+                      <button class="btn btn-t btn-sm" onclick="guardarTasaManualGasto()">Guardar</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <button class="btn btn-p" id="g-btn-add" onclick="addGasto()"
+                style="width:100%;justify-content:center;margin-top:.8rem;" disabled>+ Agregar Gasto</button>
+            </div>
+
+            <div class="card">
+              <div class="card-lbl">Resumen por Semana</div>
+              <div id="g-sem" style="display:flex;flex-direction:column;gap:.5rem;"></div>
+              <div class="hr"></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <span class="muted small">Total mes</span>
+                <div style="text-align:right;">
+                  <div class="mono teal" id="g-tot-usd-main" style="font-size:1.1rem;">— USD</div>
+                  <div class="mono gold xs" id="g-tot-bs-sub">— Bs.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-lbl" style="display:flex;justify-content:space-between;align-items:center;">
+              Historial de Gastos
+              <button class="btn btn-d btn-sm" onclick="clearG()">Borrar todo</button>
+            </div>
+            <!-- Filtro mes -->
+            <div style="display:flex;gap:.7rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center;">
+              <input type="month" id="g-mes-filtro" style="max-width:180px;" onchange="cargarGastosMes()">
+              <span class="xs muted">Filtra por mes para cargar desde Sheets</span>
+            </div>
+            <div id="g-list"></div>
+            <div id="g-empty" class="muted small" style="text-align:center;padding:1.5rem;">Sin gastos registrados.
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════
+         GASTOS FIJOS
+    ════════════════════════════════════════════════ -->
+        <div class="page" id="page-fijos">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.2rem;">
+            <div>
+              <div class="pg-title">Gastos Fijos</div>
+              <div class="pg-sub">Gastos recurrentes en USD. Se actualizan automáticamente con la tasa BCV activa cada
+                mes.</div>
+            </div>
+            <button class="btn btn-t btn-sm" onclick="syncGastosFijos()">⟳ Actualizar</button>
+          </div>
+          <div class="g2">
+            <div class="card">
+              <div class="card-lbl">Nuevo Gasto Fijo</div>
+              <div class="fld"><label>Descripción</label>
+                <input type="text" id="gf-desc" placeholder="Netflix, Gym, Internet...">
+              </div>
+              <div class="fld"><label>Monto (USD)</label>
+                <div style="position:relative;">
+                  <span
+                    style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--teal);font-family:'IBM Plex Mono',monospace;font-size:.85rem;font-weight:600;">$</span>
+                  <input type="number" id="gf-monto" placeholder="0.00" step="0.01" oninput="syncFijo()"
+                    style="padding-left:1.8rem;">
+                </div>
+                <div id="gf-conv"
+                  style="margin-top:.4rem;font-size:.75rem;color:var(--text2);font-family:'IBM Plex Mono',monospace;">≈
+                  — Bs. a tasa activa</div>
+              </div>
+              <div class="fld"><label>Categoría</label>
+                <select id="gf-cat">
+                  <option>Servicios</option>
+                  <option>Entretenimiento</option>
+                  <option>Salud</option>
+                  <option>Educación</option>
+                  <option>Hogar</option>
+                  <option>Transporte</option>
+                  <option>Otro</option>
+                </select>
+              </div>
+              <button class="btn btn-p" onclick="addGastoFijo()" style="width:100%;justify-content:center;">+ Agregar
+                Gasto Fijo</button>
+            </div>
+
+            <div class="card">
+              <div class="card-lbl">Resumen de Gastos Fijos</div>
+              <div style="margin-bottom:1rem;">
+                <div class="xs muted" style="margin-bottom:.3rem;">Total mensual en USD</div>
+                <div class="mono teal" id="gf-total-usd" style="font-size:1.5rem;">$ 0.00</div>
+                <div class="mono gold xs" id="gf-total-bs" style="margin-top:.2rem;">Bs. 0.00 a tasa activa</div>
+              </div>
+              <div class="hr"></div>
+              <div class="xs muted">💡 Estos gastos se suman al análisis de ahorro como carga fija mensual.</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-lbl">Lista de Gastos Fijos</div>
+            <div id="gf-list"></div>
+            <div id="gf-empty" class="muted small" style="text-align:center;padding:1.5rem;">Sin gastos fijos
+              registrados.</div>
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════
+         AHORRO
+    ════════════════════════════════════════════════ -->
+        <div class="page" id="page-ahorro">
+          <div class="pg-title">Ahorro & Análisis</div>
+          <div class="pg-sub">Moneda principal: <span style="color:var(--teal);font-weight:600;">USD</span> · Bs. como
+            referencia · Meta: 40%</div>
+
+          <div class="g3" style="margin-bottom:1.2rem;">
+            <div class="kpi" style="--ac:var(--green)">
+              <div class="kpi-lbl">Ingresos Totales</div>
+              <div class="kpi-val green" id="a-iusd">— USD</div>
+              <div class="kpi-sub" id="a-ibs">— Bs.</div>
+            </div>
+            <div class="kpi" style="--ac:var(--red)">
+              <div class="kpi-lbl">Total Gastos</div>
+              <div class="kpi-val red" id="a-gusd">— USD</div>
+              <div class="kpi-sub" id="a-gbs">— Bs.</div>
+            </div>
+            <div class="kpi" style="--ac:var(--teal)">
+              <div class="kpi-lbl">Saldo Disponible</div>
+              <div class="kpi-val teal" id="a-susd">— USD</div>
+              <div class="kpi-sub" id="a-sbs">— Bs.</div>
+            </div>
+          </div>
+
+          <div class="g2">
+            <div class="card">
+              <div class="card-lbl">Meta de Ahorro — 40%</div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.3rem;">
+                <span class="small muted">Meta (40%)</span>
+                <div style="text-align:right;">
+                  <div class="mono teal" id="a-meta-usd" style="font-size:.95rem;">— USD</div>
+                  <div class="mono gold xs" id="a-meta-bs">— Bs.</div>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:.6rem;">
+                <span class="small muted">Ahorro estimado</span>
+                <div style="text-align:right;">
+                  <div class="mono" id="a-act-usd" style="font-size:.95rem;">— USD</div>
+                  <div class="mono gold xs" id="a-act-bs">— Bs.</div>
+                </div>
+              </div>
+              <div class="prog-wrap">
+                <div class="prog-fill" id="a-bar"
+                  style="background:linear-gradient(90deg,var(--teal),var(--green));width:0%"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:.4rem;">
+                <span class="xs muted" id="a-pct">0%</span>
+                <span class="xs muted">Meta: 40%</span>
+              </div>
+              <div class="hr"></div>
+              <div id="a-adv" style="font-size:.82rem;line-height:1.6;color:var(--text2);"></div>
+            </div>
+            <div class="card">
+              <div class="card-lbl">Gastos por Categoría (USD)</div>
+              <div style="position:relative;height:220px;"><canvas id="ch-cat"></canvas></div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-lbl">Flujo Mensual (USD)</div>
+            <div style="position:relative;height:280px;"><canvas id="ch-flow"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-lbl">Gastos por Semana</div>
+            <div style="position:relative;height:220px;"><canvas id="ch-week"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-lbl">Composición de Ingresos (USD)</div>
+            <div style="position:relative;height:220px;"><canvas id="ch-ing"></canvas></div>
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════
+         HISTÓRICO TASAS
+    ════════════════════════════════════════════════ -->
+        <div class="page" id="page-htasas">
+          <div class="pg-title">Histórico de Tasas BCV</div>
+          <div class="pg-sub">Consulta o busca tasas de días anteriores. Úsalas para ver cómo estaban tus finanzas en
+            esa fecha.</div>
+
+          <div class="g2">
+            <div class="card">
+              <div class="card-lbl">Buscar tasa por fecha</div>
+              <div class="fld"><label>Fecha a consultar</label>
+                <input type="date" id="ht-fecha">
+              </div>
+              <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+                <button class="btn btn-t" onclick="buscarTasaHistorica()">🔍 Buscar en API</button>
+                <button class="btn btn-s" onclick="guardarTasaManual()">+ Guardar manual</button>
+              </div>
+              <div id="ht-status"
+                style="display:none;margin-top:.9rem;font-size:.8rem;padding:.7rem 1rem;border-radius:8px;"></div>
+            </div>
+            <div class="card">
+              <div class="card-lbl">Tasa activa</div>
+              <div style="margin-bottom:.5rem;">
+                <div class="xs muted">Tasa actual del sistema</div>
+                <div class="mono gold" style="font-size:1.6rem;" id="ht-activa">—</div>
+                <div class="xs muted" id="ht-activa-fecha">—</div>
+              </div>
+              <div class="hr"></div>
+              <div class="xs muted">💡 Haz clic en cualquier tasa del historial para usarla como referencia en el
+                Resumen.</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-lbl" style="display:flex;justify-content:space-between;align-items:center;">
+              Historial de Tasas
+              <button class="btn btn-t btn-sm" onclick="cargarTasasHistoricas()">⟳ Actualizar</button>
+            </div>
+            <div id="ht-list" style="max-height:500px;overflow-y:auto;">
+              <div class="muted small" style="text-align:center;padding:1.5rem;">Cargando...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════
+         HISTÓRICO SALARIOS
+    ════════════════════════════════════════════════ -->
+        <div class="page" id="page-hsalarios">
+          <div class="pg-title">Historial de Salarios</div>
+          <div class="pg-sub">Cada vez que guardas tu configuración se registra un snapshot con la tasa BCV del día.
+          </div>
+
+          <div class="g3" style="margin-bottom:1.2rem;">
+            <div class="kpi" style="--ac:var(--blue)">
+              <div class="kpi-lbl">Salario Actual (USD)</div>
+              <div class="kpi-val blue" id="hs-sal-usd">—</div>
+              <div class="kpi-sub" id="hs-sal-bs">—</div>
+            </div>
+            <div class="kpi" style="--ac:var(--gold)">
+              <div class="kpi-lbl">Tasa en último aumento</div>
+              <div class="kpi-val gold" id="hs-tasa">—</div>
+              <div class="kpi-sub" id="hs-tasa-fecha">—</div>
+            </div>
+            <div class="kpi" style="--ac:var(--green)">
+              <div class="kpi-lbl">Total con bonos (USD)</div>
+              <div class="kpi-val green" id="hs-total-usd">—</div>
+              <div class="kpi-sub" id="hs-total-bs">—</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-lbl" style="display:flex;justify-content:space-between;align-items:center;">
+              Historial de Cambios Salariales
+              <button class="btn btn-t btn-sm" onclick="cargarHistorialSalarios()">⟳ Actualizar</button>
+            </div>
+            <div id="hs-list">
+              <div class="muted small" style="text-align:center;padding:1.5rem;">Cargando...</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-lbl">Evolución Salarial en USD</div>
+            <div style="position:relative;height:260px;"><canvas id="ch-sal"></canvas></div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+
+  </div><!-- /layout -->
+  </div><!-- /main-app -->
+
+  <!-- ═══════════════════════════════════════════════
+     MODAL: BCV
+════════════════════════════════════════════════ -->
+  <div class="overlay" id="modal-bcv">
+    <div class="modal">
+      <h3>⟳ Gestionar Tasa BCV</h3>
+      <div class="info t">La tasa se guarda en Google Sheets. Puedes obtenerla automáticamente o ingresarla manualmente.
+      </div>
+      <div class="fld"><label>Tasa BCV (Bs. / USD)</label>
+        <input type="number" id="m-bcv" placeholder="0.00" step="0.01">
+      </div>
+      <div class="fld"><label>Fecha valor</label>
+        <input type="date" id="m-dt">
+      </div>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;">
+        <button class="btn btn-t" onclick="fetchAction(true)">⟳ Obtener tasa BCV</button>
+        <button class="btn btn-p" onclick="saveModal()">✓ Guardar</button>
+        <button class="btn btn-s" onclick="closeModal('modal-bcv')">Cancelar</button>
+      </div>
+      <div id="m-status" style="display:none;margin-top:.8rem;font-size:.8rem;padding:.6rem .9rem;border-radius:8px;">
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+     PANTALLA DE AUTENTICACIÓN
+════════════════════════════════════════════════ -->
+  <div id="auth-screen"
+    style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--navy);padding:1.5rem;">
+    <div style="width:100%;max-width:380px;">
+      <!-- Logo -->
+      <div style="text-align:center;margin-bottom:2rem;">
+        <div style="font-size:1.6rem;font-weight:600;color:#fff;letter-spacing:.06em;">FINANZAS<span
+            style="color:var(--gold);">VE</span></div>
+        <div style="font-size:.82rem;color:var(--text2);margin-top:.4rem;">Gestor de finanzas personales venezolano
+        </div>
+      </div>
+
+      <!-- Card auth -->
+      <div style="background:var(--navy2);border:1px solid var(--border);border-radius:14px;padding:1.8rem;">
+        <div id="auth-title" style="font-size:1rem;font-weight:600;color:#fff;margin-bottom:1.2rem;text-align:center;">
+          Iniciar sesión</div>
+
+        <div id="auth-mode" data-mode="login">
+          <!-- Login con Email -->
+          <div style="margin-bottom:.7rem;">
+            <label
+              style="font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);display:block;margin-bottom:.35rem;">Email</label>
+            <input type="email" id="auth-email" placeholder="tu@email.com"
+              style="width:100%;padding:.65rem .9rem;background:var(--navy3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:.88rem;"
+              onkeydown="if(event.key==='Enter')handleSignIn()">
+          </div>
+          <div style="margin-bottom:1rem;">
+            <label
+              style="font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text2);display:block;margin-bottom:.35rem;">Contraseña</label>
+            <input type="password" id="auth-pass" placeholder="mínimo 6 caracteres"
+              style="width:100%;padding:.65rem .9rem;background:var(--navy3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:.88rem;"
+              onkeydown="if(event.key==='Enter')handleSignIn()">
+          </div>
+
+          <button id="auth-btn-email" onclick="handleSignIn()"
+            style="width:100%;padding:.72rem;border-radius:9px;border:none;background:var(--gold);color:#0b1120;font-family:'IBM Plex Sans',sans-serif;font-size:.88rem;font-weight:700;cursor:pointer;margin-bottom:.6rem;">
+            Entrar
+          </button>
+          <button id="auth-btn-register" onclick="handleSignUp()"
+            style="width:100%;display:none;padding:.72rem;border-radius:9px;border:1px solid var(--teal);background:transparent;color:var(--teal);font-family:'IBM Plex Sans',sans-serif;font-size:.88rem;font-weight:600;cursor:pointer;margin-bottom:.6rem;">
+            Crear cuenta
+          </button>
+
+          <div id="auth-err" style="display:none;"></div>
+
+          <div style="text-align:center;margin-top:.9rem;">
+            <span id="auth-toggle-lbl" style="font-size:.78rem;color:var(--text2);">¿No tienes cuenta? </span>
+            <button id="auth-toggle-btn" onclick="toggleAuthMode()"
+              style="background:none;border:none;color:var(--teal);font-size:.78rem;font-weight:600;cursor:pointer;font-family:'IBM Plex Sans',sans-serif;">Crear
+              cuenta gratis</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align:center;margin-top:1rem;font-size:.72rem;color:var(--text2);opacity:.5;">
+        Tu data es privada y solo tú puedes verla
+      </div>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+
+</html>
