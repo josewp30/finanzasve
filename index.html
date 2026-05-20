@@ -94,6 +94,8 @@
         <button class="nav-btn" onclick="nav(this,'semanal')"><span class="ic">▦</span><span
             class="nav-lbl">Calendario</span></button>
         <div class="nav-sec">Análisis</div>
+        <button class="nav-btn" onclick="nav(this,'ingresos')"><span class="ic">↑</span><span
+            class="nav-lbl">Ingresos Extras</span></button>
         <button class="nav-btn" onclick="nav(this,'gastos')"><span class="ic">↓</span><span
             class="nav-lbl">Gastos</span></button>
         <button class="nav-btn" onclick="nav(this,'fijos')"><span class="ic">📌</span><span
@@ -250,6 +252,98 @@
           <div class="pg-title">Calendario de Pagos</div>
           <div class="pg-sub">Distribución semanal de ingresos. USD primario · Bs. referencia.</div>
           <div id="week-blocks"></div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════
+         INGRESOS EXTRAS
+    ════════════════════════════════════════════════ -->
+        <div class="page" id="page-ingresos">
+          <div class="pg-title">Ingresos Extras</div>
+          <div class="pg-sub">Registra tus ingresos adicionales o extraordinarios (freelance, ventas, regalos, etc.).</div>
+          <div class="g2">
+            <div class="card">
+              <div class="card-lbl">Nuevo Ingreso Extra</div>
+              <div class="fld"><label>Descripción</label>
+                <input type="text" id="ing-desc" placeholder="Proyecto X, Venta de equipo...">
+              </div>
+              <div class="fld">
+                <label>Moneda de ingreso</label>
+                <div style="display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:.7rem;">
+                  <button id="ing-cur-usd" onclick="setIngCur('usd')"
+                    style="flex:1;padding:.55rem;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;background:var(--teal);color:#0b1120;transition:all .15s;">$ USD</button>
+                  <button id="ing-cur-bs" onclick="setIngCur('bs')"
+                    style="flex:1;padding:.55rem;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;background:var(--navy3);color:var(--text2);transition:all .15s;">Bs.</button>
+                </div>
+                <div id="ing-inp-usd-wrap">
+                  <div style="position:relative;">
+                    <span style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--teal);font-family:'IBM Plex Mono',monospace;font-size:.85rem;font-weight:600;">$</span>
+                    <input type="number" id="ing-m-usd" placeholder="0.00" step="0.01" oninput="syncCurrencyIngreso('usd')" style="padding-left:1.8rem;">
+                  </div>
+                  <div id="ing-conv-bs" style="margin-top:.4rem;font-size:.75rem;color:var(--text2);font-family:'IBM Plex Mono',monospace;">≈ — Bs. (tasa del día)</div>
+                </div>
+                <div id="ing-inp-bs-wrap" style="display:none;">
+                  <div style="position:relative;">
+                    <span style="position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--gold2);font-family:'IBM Plex Mono',monospace;font-size:.75rem;font-weight:600;">Bs.</span>
+                    <input type="number" id="ing-m-bs" placeholder="0.00" step="0.01" oninput="syncCurrencyIngreso('bs')" style="padding-left:2.5rem;">
+                  </div>
+                  <div id="ing-conv-usd" style="margin-top:.4rem;font-size:.75rem;color:var(--text2);font-family:'IBM Plex Mono',monospace;">≈ — USD</div>
+                </div>
+              </div>
+              <div class="g2" style="gap:.7rem;">
+                <div class="fld" style="margin:0;"><label>Fecha</label>
+                  <input type="date" id="ing-f" onchange="onFechaIngresoChange()">
+                </div>
+                <div class="fld" style="margin:0;"><label>Categoría</label>
+                  <select id="ing-c">
+                    <option>Trabajo Freelance</option>
+                    <option>Ventas</option>
+                    <option>Regalo</option>
+                    <option>Remesas</option>
+                    <option>Inversiones</option>
+                    <option>Otro</option>
+                  </select>
+                </div>
+              </div>
+              <div id="ing-tasa-box" style="margin-top:.7rem;border-radius:8px;padding:.6rem .85rem;display:none;">
+                <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.4rem;">
+                  <div>
+                    <div id="ing-tasa-lbl" style="font-size:.72rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;margin-bottom:.2rem;"></div>
+                    <div id="ing-tasa-val" style="font-family:'IBM Plex Mono',monospace;font-size:.9rem;font-weight:500;"></div>
+                  </div>
+                  <div id="ing-tasa-manual-wrap" style="display:none;">
+                    <div style="display:flex;gap:.4rem;align-items:center;">
+                      <input type="number" id="ing-tasa-manual" placeholder="Bs./USD" step="0.01" style="width:110px;padding:.4rem .6rem;font-size:.8rem;" oninput="onTasaManualInputIngreso()">
+                      <button class="btn btn-t btn-sm" onclick="guardarTasaManualIngreso()">Guardar</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <button class="btn btn-p" id="ing-btn-add" onclick="addIngresoExtra()" style="width:100%;justify-content:center;margin-top:.8rem;" disabled>+ Agregar Ingreso</button>
+            </div>
+            
+            <div class="card">
+              <div class="card-lbl">Total Ingresos Extras</div>
+              <div style="text-align:left; margin-bottom: 1.5rem;">
+                <div class="mono teal" id="ing-tot-usd-main" style="font-size:1.8rem; font-weight:600;">— USD</div>
+                <div class="mono gold" id="ing-tot-bs-sub" style="font-size:1.1rem; margin-top:.3rem;">— Bs.</div>
+              </div>
+              <div class="hr"></div>
+              <div class="xs muted">💡 Los ingresos extras se suman automáticamente al análisis de ahorro y saldo disponible del mes.</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-lbl" style="display:flex;justify-content:space-between;align-items:center;">
+              Historial de Ingresos Extras
+              <button class="btn btn-d btn-sm" onclick="clearIngresos()">Borrar todo</button>
+            </div>
+            <div style="display:flex;gap:.7rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center;">
+              <input type="month" id="ing-mes-filtro" style="max-width:180px;" onchange="cargarIngresosMes()">
+              <span class="xs muted">Filtra por mes para ver tus ingresos extras</span>
+            </div>
+            <div id="ing-list"></div>
+            <div id="ing-empty" class="muted small" style="text-align:center;padding:1.5rem;">Sin ingresos extras registrados.</div>
+          </div>
         </div>
 
         <!-- ═══════════════════════════════════════════════

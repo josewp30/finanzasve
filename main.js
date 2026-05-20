@@ -60,13 +60,15 @@
         }
 
         // Sanitizar y asegurar arrays
-        ['gastos', 'gastosFijos', 'tasasHistoricas', 'salarios', 'deletedGastos', 'deletedFijos'].forEach(k => { if (!Array.isArray(S[k])) S[k] = []; });
+        ['gastos', 'gastosFijos', 'tasasHistoricas', 'salarios', 'deletedGastos', 'deletedFijos', 'ingresos'].forEach(k => { if (!Array.isArray(S[k])) S[k] = []; });
 
         // Poblar Inputs para que liveCalc funcione
         const setV = (id, v) => { const e = document.getElementById(id); if (e) e.value = v || ''; };
         const hoy = new Date().toISOString().split('T')[0];
         setV('g-f', hoy); setV('inp-dt', hoy); setV('m-dt', hoy); setV('ht-fecha', hoy);
         setV('g-mes-filtro', hoy.slice(0, 7));
+        setV('ing-f', hoy);
+        setV('ing-mes-filtro', hoy.slice(0, 7));
 
         if (S.bcv) setV('inp-bcv', S.bcv);
         if (S.salario) setV('inp-sal', S.salario);
@@ -81,6 +83,7 @@
         renderSemanal();
         renderGastos();
         renderGastosFijos();
+        renderIngresos();
         hideLoading(); // Quitar splash screen YA
       } catch (e) {
         console.error("Error fast load:", e);
@@ -90,12 +93,13 @@
       // 2. SINCRONIZACIÓN EN SEGUNDO PLANO (Nube)
       setSyncState('loading', 'Sincronizando...');
       try {
-        const [resTasas, resFijos, resCfg, resGastos, resSal] = await Promise.all([
+        const [resTasas, resFijos, resCfg, resGastos, resSal, resIngresos] = await Promise.all([
           apiGet('getTasas').catch(e => { console.error('getTasas err:', e); return { status: 'err' }; }),
           apiGet('getGastosFijos').catch(e => { console.error('getGastosFijos err:', e); return { status: 'err' }; }),
           apiGet('getConfig').catch(e => { console.error('getConfig err:', e); return { status: 'err' }; }),
           apiGet('getGastos').catch(e => { console.error('getGastos err:', e); return { status: 'err' }; }),
-          apiGet('getSalarios').catch(e => { console.error('getSalarios err:', e); return { status: 'err' }; })
+          apiGet('getSalarios').catch(e => { console.error('getSalarios err:', e); return { status: 'err' }; }),
+          apiGet('getIngresos').catch(e => { console.error('getIngresos err:', e); return { status: 'err' }; })
         ]);
         console.log("=== DB SYNC RESULTS ===");
         console.log("Tasas:", resTasas);
@@ -103,6 +107,7 @@
         console.log("Config:", resCfg);
         console.log("Gastos:", resGastos);
         console.log("Salarios:", resSal);
+        console.log("Ingresos:", resIngresos);
         console.log("CurrentUser ID:", currentUser?.id);
         console.log("=======================");
 
@@ -116,6 +121,9 @@
         }
         if (resGastos.status === 'ok') {
           S.gastos = resGastos.data;
+        }
+        if (resIngresos.status === 'ok') {
+          S.ingresos = resIngresos.data;
         }
         if (resSal.status === 'ok') {
           S.salarios = resSal.data.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
@@ -157,6 +165,7 @@
         renderAhorro();
         renderGastos();
         renderGastosFijos();
+        renderIngresos();
         setSyncState('ok');
       } catch (err) {
         setSyncState('err', 'Modo local');
@@ -270,6 +279,7 @@
       tasasHistoricas: [], // caché
       salarios: [],       // caché historial
       tasaVista: 0,       // tasa seleccionada para vista histórica
+      ingresos: [],       // caché ingresos extras
     };
     let CH = {};
     const LS_KEY = 'fve4';
@@ -356,6 +366,23 @@
 
         if (accion === 'getGastos') {
           let query = sb.from('gastos')
+            .select('*')
+            .eq('user_id', uid)
+            .order('fecha', { ascending: false });
+
+          if (params && params.mes) {
+            query = query
+              .gte('fecha', `${params.mes}-01`)
+              .lte('fecha', `${params.mes}-31`);
+          }
+
+          const { data, error } = await query;
+          if (error) throw error;
+          return { status: 'ok', data: data || [] };
+        }
+
+        if (accion === 'getIngresos') {
+          let query = sb.from('ingresos')
             .select('*')
             .eq('user_id', uid)
             .order('fecha', { ascending: false });
@@ -476,6 +503,32 @@
           );
         if (error) throw error;
         return { status: 'ok', data: { saved: true } };
+      }
+
+      // ── GUARDAR INGRESO EXTRA (insert) ────────────────────
+      if (accion === 'saveIngreso') {
+        const { data, error } = await sb.from('ingresos')
+          .insert({
+            fecha: body.fecha, descripcion: body.descripcion,
+            categoria: body.categoria || 'Otro',
+            monto_usd: +body.monto_usd, tasa_dia: +body.tasa_dia,
+            monto_bs_dia: +body.monto_bs_dia,
+            user_id: uid,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        return { status: 'ok', data: { saved: true, id: data.id } };
+      }
+
+      // ── ELIMINAR INGRESO EXTRA ────────────────────────────
+      if (accion === 'deleteIngreso') {
+        const { error } = await sb.from('ingresos')
+          .delete()
+          .eq('id', body.id)
+          .eq('user_id', uid); // seguridad: solo borra los propios
+        if (error) throw error;
+        return { status: 'ok', data: { deleted: true, id: body.id } };
       }
 
       throw new Error('apiPost acción desconocida: ' + accion);
@@ -1148,6 +1201,277 @@
     }
 
     // ═══════════════════════════════════════════════════════════
+    //  INGRESOS EXTRAS
+    // ═══════════════════════════════════════════════════════════
+    let ingCur = 'usd';
+    let ingTasaDiaActual = 0;
+
+    function setIngCur(cur) {
+      ingCur = cur;
+      document.getElementById('ing-inp-usd-wrap').style.display = cur === 'usd' ? 'block' : 'none';
+      document.getElementById('ing-inp-bs-wrap').style.display = cur === 'bs' ? 'block' : 'none';
+      document.getElementById('ing-cur-usd').style.cssText = `flex:1;padding:.55rem;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;background:${cur === 'usd' ? 'var(--teal);color:#0b1120' : 'var(--navy3);color:var(--text2)'};transition:all .15s;`;
+      document.getElementById('ing-cur-bs').style.cssText = `flex:1;padding:.55rem;border:none;font-family:'IBM Plex Sans',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer;background:${cur === 'bs' ? 'var(--gold);color:#0b1120' : 'var(--navy3);color:var(--text2)'};transition:all .15s;`;
+    }
+
+    function setIngTasaBox(estado, tasa, fecha, msg) {
+      const box = document.getElementById('ing-tasa-box');
+      const lbl = document.getElementById('ing-tasa-lbl');
+      const val = document.getElementById('ing-tasa-val');
+      const manW = document.getElementById('ing-tasa-manual-wrap');
+      const btn = document.getElementById('ing-btn-add');
+      if (!box || !lbl || !val || !manW || !btn) return;
+      box.style.display = 'block';
+
+      const estilos = {
+        ok: 'background:rgba(68,201,126,.08);border:1px solid rgba(68,201,126,.2);',
+        api: 'background:rgba(41,184,176,.08);border:1px solid rgba(41,184,176,.2);',
+        loading: 'background:rgba(200,168,75,.06);border:1px solid rgba(200,168,75,.2);',
+        manual: 'background:rgba(74,143,240,.08);border:1px solid rgba(74,143,240,.2);',
+        error: 'background:rgba(224,92,92,.06);border:1px solid rgba(224,92,92,.2);',
+      };
+      const colores = { ok: 'var(--green)', api: 'var(--teal)', loading: 'var(--gold2)', manual: 'var(--blue)', error: 'var(--red)' };
+
+      box.style.cssText += estilos[estado] || estilos.ok;
+      lbl.style.color = colores[estado] || colores.ok;
+      lbl.textContent = msg || '';
+      val.style.color = colores[estado] || colores.ok;
+      val.textContent = tasa > 0 ? `Bs. ${N(tasa)} / USD · ${fecha || ''}` : '';
+      manW.style.display = estado === 'error' ? 'block' : 'none';
+      btn.disabled = (estado === 'loading' || estado === 'error');
+      ingTasaDiaActual = tasa > 0 ? tasa : 0;
+      syncCurrencyIngreso(ingCur === 'usd' ? 'usd' : 'bs');
+    }
+
+    async function onFechaIngresoChange() {
+      const fecha = document.getElementById('ing-f').value;
+      if (!fecha) return;
+      const hoy = new Date().toISOString().split('T')[0];
+
+      if (fecha === hoy) {
+        if (S.bcv > 0) {
+          setIngTasaBox('ok', S.bcv, fecha, '✓ Tasa activa (hoy)');
+        } else {
+          setIngTasaBox('error', 0, fecha, '⚠ Sin tasa activa — ingrésala manualmente');
+        }
+        return;
+      }
+
+      const local = S.tasasHistoricas.find(t => t.fecha === fecha);
+      if (local && parseFloat(local.tasa) > 0) {
+        setIngTasaBox('ok', parseFloat(local.tasa), fecha, '✓ Encontrada en historial');
+        return;
+      }
+
+      setIngTasaBox('loading', 0, fecha, '⟳ Buscando tasa en API histórica...');
+      const resultado = await fetchTasaHistoricaAPI(fecha);
+      if (resultado && resultado.rate > 0) {
+        S.tasasHistoricas.unshift({ fecha: resultado.fecha, tasa: resultado.rate, fuente: resultado.fuente });
+        S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+        lsSave();
+        try { await apiPost('saveTasa', { fecha: resultado.fecha, tasa: resultado.rate, fuente: resultado.fuente }); } catch { }
+        poblarSelectorTasas();
+        setIngTasaBox('api', resultado.rate, resultado.fecha, '✓ Obtenida de API histórica');
+      } else {
+        setIngTasaBox('error', 0, fecha, `⚠ Sin tasa para ${fecha} — ingrésala manualmente:`);
+      }
+    }
+
+    function onTasaManualInputIngreso() {
+      const t = parseFloat(document.getElementById('ing-tasa-manual').value) || 0;
+      if (t > 0) {
+        ingTasaDiaActual = t;
+        document.getElementById('ing-btn-add').disabled = false;
+        syncCurrencyIngreso(ingCur === 'usd' ? 'usd' : 'bs');
+      }
+    }
+
+    async function guardarTasaManualIngreso() {
+      const fecha = document.getElementById('ing-f').value;
+      const t = parseFloat(document.getElementById('ing-tasa-manual').value) || 0;
+      if (!t || !fecha) return;
+      S.tasasHistoricas.unshift({ fecha, tasa: t, fuente: 'Manual' });
+      S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+      lsSave(); poblarSelectorTasas();
+      try { await apiPost('saveTasa', { fecha, tasa: t, fuente: 'Manual' }); } catch { }
+      setIngTasaBox('manual', t, fecha, '✓ Tasa manual guardada');
+    }
+
+    function syncCurrencyIngreso(from) {
+      const tasa = ingTasaDiaActual > 0 ? ingTasaDiaActual : (S.bcv || 0);
+      if (from === 'usd') {
+        const usd = parseFloat(document.getElementById('ing-m-usd').value) || 0;
+        setEl('ing-conv-bs', tasa > 0 ? `≈ Bs. ${N(usd * tasa)} (tasa ${N(tasa)})` : '≈ — Bs.');
+      } else {
+        const bs = parseFloat(document.getElementById('ing-m-bs').value) || 0;
+        setEl('ing-conv-usd', tasa > 0 ? `≈ $ ${N(bs / tasa)}` : '≈ — USD');
+      }
+    }
+
+    async function addIngresoExtra() {
+      const desc = document.getElementById('ing-desc').value.trim();
+      const cat = document.getElementById('ing-c').value;
+      const fecha = document.getElementById('ing-f').value;
+      if (!desc || !fecha) { alert('Completa descripción y fecha.'); return; }
+
+      const tasaDia = ingTasaDiaActual > 0 ? ingTasaDiaActual : getTasaDia(fecha);
+      if (!tasaDia) { alert('No hay tasa disponible para esa fecha.'); return; }
+
+      let montoUSD = 0, montoBsDia = 0;
+      if (ingCur === 'usd') {
+        montoUSD = parseFloat(document.getElementById('ing-m-usd').value) || 0;
+        montoBsDia = montoUSD * tasaDia;
+      } else {
+        const bs = parseFloat(document.getElementById('ing-m-bs').value) || 0;
+        montoUSD = usdFromBs(bs, tasaDia);
+        montoBsDia = bs;
+      }
+      if (!montoUSD) { alert('Ingresa un monto válido.'); return; }
+
+      const ingreso = {
+        id: 'ing_' + Date.now(), fecha, descripcion: desc, categoria: cat,
+        monto_usd: montoUSD, tasa_dia: tasaDia, monto_bs_dia: montoBsDia
+      };
+
+      S.ingresos.push(ingreso);
+      lsSave();
+
+      // Limpiar form
+      document.getElementById('ing-desc').value = '';
+      document.getElementById('ing-m-usd').value = '';
+      document.getElementById('ing-m-bs').value = '';
+      document.getElementById('ing-conv-bs').textContent = '≈ — Bs. (tasa del día)';
+      document.getElementById('ing-conv-usd').textContent = '≈ — USD';
+
+      renderIngresos();
+      setTimeout(() => renderAhorro(), 10);
+
+      setSyncState('loading', 'Sincronizando...');
+
+      apiPost('saveIngreso', {
+        fecha, descripcion: desc, categoria: cat,
+        monto_usd: montoUSD, tasa_dia: tasaDia, monto_bs_dia: montoBsDia
+      }).then(res => {
+        if (res && res.status === 'ok' && res.data && res.data.id) {
+          const idxLocal = S.ingresos.findIndex(i => i.id === ingreso.id);
+          if (idxLocal >= 0) S.ingresos[idxLocal].id = res.data.id;
+          lsSave();
+          setSyncState('ok');
+        }
+      }).catch(err => {
+        console.error("Fallo sincro ingreso:", err);
+        setSyncState('err', 'Pendiente de subir');
+      });
+    }
+
+    async function delIngresoExtra(id) {
+      if (!confirm('¿Borrar este ingreso extra?')) return;
+      S.ingresos = S.ingresos.filter(i => i.id !== id);
+      lsSave();
+      renderIngresos(); renderAhorro();
+
+      setSyncState('loading', 'Borrando...');
+      try {
+        const res = await apiPost('deleteIngreso', { id });
+        if (res && res.status === 'ok') {
+          setSyncState('ok');
+        } else {
+          setSyncState('ok');
+        }
+      } catch (err) {
+        setSyncState('err', 'Sin conexión — borrado solo localmente');
+      }
+    }
+
+    async function clearIngresos() {
+      const mesFiltro = document.getElementById('ing-mes-filtro').value || '';
+      const label = mesFiltro ? `del mes ${mesFiltro}` : 'de TODOS los periodos';
+      if (!confirm(`¿Borrar ingresos extras ${label}? Esta acción no se puede deshacer.`)) return;
+
+      const aBorrar = mesFiltro
+        ? S.ingresos.filter(i => String(i.fecha || '').startsWith(mesFiltro))
+        : [...S.ingresos];
+
+      const idsABorrar = aBorrar.map(i => i.id).filter(id => !id.startsWith('ing_'));
+
+      S.ingresos = mesFiltro
+        ? S.ingresos.filter(i => !String(i.fecha || '').startsWith(mesFiltro))
+        : [];
+
+      lsSave();
+      renderIngresos();
+      renderAhorro();
+
+      if (idsABorrar.length === 0) return;
+
+      setSyncState('loading', 'Borrando en nube...');
+      try {
+        const uid = currentUser?.id;
+        let query = sb.from('ingresos').delete().eq('user_id', uid);
+        if (mesFiltro) {
+          query = query.gte('fecha', `${mesFiltro}-01`).lte('fecha', `${mesFiltro}-31`);
+        }
+        const { error } = await query;
+        if (error) throw error;
+        setSyncState('ok');
+      } catch (err) {
+        console.error("Fallo borrado nube ingresos:", err);
+        setSyncState('err', 'Error al borrar en nube');
+      }
+    }
+
+    function cargarIngresosMes() {
+      renderIngresos(); renderAhorro();
+    }
+
+    function renderIngresos() {
+      const mesFiltro = (document.getElementById('ing-mes-filtro') || {}).value || '';
+      const ingresosDelMes = mesFiltro
+        ? S.ingresos.filter(i => String(i.fecha || '').startsWith(mesFiltro))
+        : S.ingresos;
+      const sorted = [...ingresosDelMes].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
+      const empty = document.getElementById('ing-empty'), list = document.getElementById('ing-list');
+      if (!list) return;
+      if (!sorted.length) {
+        if (empty) empty.style.display = 'block';
+        list.innerHTML = '';
+      } else {
+        if (empty) empty.style.display = 'none';
+        list.innerHTML = sorted.map(i => {
+          const usd = parseFloat(i.monto_usd) || 0;
+          const bsDia = parseFloat(i.monto_bs_dia) || (usd * (parseFloat(i.tasa_dia) || S.bcv));
+          const tasaDia = parseFloat(i.tasa_dia) || S.bcv;
+          return `<div style="display:flex;align-items:center;gap:.7rem;background:var(--navy3);border-radius:8px;padding:.65rem .9rem;margin-bottom:.4rem;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            ${i.descripcion || ''}
+          </div>
+          <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;margin-top:.25rem;">
+            <span class="xs muted">${i.fecha}</span>
+            <span class="bdg bdg-teal">${i.categoria || 'Otro'}</span>
+            <span style="font-size:.65rem;color:var(--text2);font-family:'IBM Plex Mono',monospace;opacity:.6;">
+              tasa Bs.${N(tasaDia)}
+            </span>
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div class="mono teal" style="font-size:1rem;font-weight:600;">${fUSD(usd)}</div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:.68rem;color:var(--text2);opacity:.55;margin-top:.1rem;">
+            Bs.${N(bsDia)}
+          </div>
+        </div>
+        <button class="btn btn-d btn-sm" onclick="delIngresoExtra('${i.id}')">✕</button>
+      </div>`;
+        }).join('');
+      }
+
+      const totUSD = ingresosDelMes.reduce((a, i) => a + (parseFloat(i.monto_usd) || 0), 0);
+      const totBs = ingresosDelMes.reduce((a, i) => a + (parseFloat(i.monto_bs_dia) || 0), 0);
+      setEl('ing-tot-usd-main', fUSD(totUSD));
+      setEl('ing-tot-bs-sub', fBs(totBs));
+    }
+
+    // ═══════════════════════════════════════════════════════════
     //  GASTOS FIJOS
     // ═══════════════════════════════════════════════════════════
     function syncFijo() {
@@ -1271,18 +1595,34 @@
       const cbs = cu * bcv, ay = cbs * .65, totalBs = sal + b1 + b2 + cbs + ay;
       const totalUSD = usdFromBs(totalBs, bcv);
 
-      const totGasUSD = S.gastos.reduce((a, g) => a + (parseFloat(g.monto_usd) || 0), 0);
-      const totGasBsDia = S.gastos.reduce((a, g) => a + (parseFloat(g.monto_bs_dia) || 0), 0);
+      const mesFiltro = (document.getElementById('g-mes-filtro') || {}).value || new Date().toISOString().slice(0, 7);
+
+      const gastosDelMes = mesFiltro
+        ? S.gastos.filter(g => String(g.fecha || '').startsWith(mesFiltro))
+        : S.gastos;
+
+      const ingresosDelMes = mesFiltro
+        ? S.ingresos.filter(i => String(i.fecha || '').startsWith(mesFiltro))
+        : S.ingresos;
+
+      const totGasUSD = gastosDelMes.reduce((a, g) => a + (parseFloat(g.monto_usd) || 0), 0);
+      const totGasBsDia = gastosDelMes.reduce((a, g) => a + (parseFloat(g.monto_bs_dia) || 0), 0);
       const fijosFijos = S.gastosFijos.filter(g => g.activo !== false && g.activo !== 'FALSE');
       const totFijosUSD = fijosFijos.reduce((a, g) => a + (parseFloat(g.monto_usd) || 0), 0);
       const totalGastosUSD = totGasUSD + totFijosUSD;
 
-      const saldoUSD = totalUSD - totalGastosUSD;
-      const saldoBs = totalBs - (totGasBsDia + bsFromUSD(totFijosUSD, bcv));
-      const metaUSD = totalUSD * .4, metaBs = totalBs * .4;
-      const pct = totalUSD > 0 ? Math.min((Math.max(saldoUSD, 0) / totalUSD) * 100, 100) : 0;
+      const totIngExtrasUSD = ingresosDelMes.reduce((a, i) => a + (parseFloat(i.monto_usd) || 0), 0);
+      const totIngExtrasBs = ingresosDelMes.reduce((a, i) => a + (parseFloat(i.monto_bs_dia) || 0), 0);
 
-      setEl('a-iusd', fUSD(totalUSD)); setEl('a-ibs', fBs(totalBs));
+      const totalIncomesUSD = totalUSD + totIngExtrasUSD;
+      const totalIncomesBs = totalBs + totIngExtrasBs;
+
+      const saldoUSD = totalIncomesUSD - totalGastosUSD;
+      const saldoBs = totalIncomesBs - (totGasBsDia + bsFromUSD(totFijosUSD, bcv));
+      const metaUSD = totalIncomesUSD * .4, metaBs = totalIncomesBs * .4;
+      const pct = totalIncomesUSD > 0 ? Math.min((Math.max(saldoUSD, 0) / totalIncomesUSD) * 100, 100) : 0;
+
+      setEl('a-iusd', fUSD(totalIncomesUSD)); setEl('a-ibs', fBs(totalIncomesBs));
       setEl('a-gusd', fUSD(totalGastosUSD)); setEl('a-gbs', fBs(totGasBsDia + bsFromUSD(totFijosUSD, bcv)));
       setEl('a-susd', fUSD(saldoUSD)); setEl('a-sbs', fBs(saldoBs));
       setEl('a-meta-usd', fUSD(metaUSD)); setEl('a-meta-bs', fBs(metaBs));
@@ -1290,9 +1630,9 @@
       document.getElementById('a-bar').style.width = pct + '%';
       setEl('a-pct', pct.toFixed(1) + '%');
 
-      const pctG = totalUSD > 0 ? (totalGastosUSD / totalUSD) * 100 : 0;
+      const pctG = totalIncomesUSD > 0 ? (totalGastosUSD / totalIncomesUSD) * 100 : 0;
       let adv;
-      if (!totalUSD) adv = 'Configura tus ingresos para ver el análisis.';
+      if (!totalIncomesUSD) adv = 'Configura tus ingresos para ver el análisis.';
       else if (pct >= 40) adv = `✅ Excelente — ahorras ${pct.toFixed(1)}%. Saldo: ${fUSD(Math.max(saldoUSD, 0))}`;
       else if (pct >= 20) adv = `⚠ Ahorras ${pct.toFixed(1)}%. Para llegar al 40% reduce gastos en ${fUSD(metaUSD - Math.max(saldoUSD, 0))}.`;
       else adv = `🔴 Ahorro ${pct.toFixed(1)}%. Gastos = ${pctG.toFixed(1)}% del ingreso. Meta 40% = ${fUSD(metaUSD)}.`;
@@ -1301,7 +1641,7 @@
 
       // Chart data — USD INMUTABLE desde monto_usd guardado, nunca recalculado
       const catMap = {};
-      S.gastos.forEach(g => {
+      gastosDelMes.forEach(g => {
         const c = g.categoria || g.cat || 'Otro';
         catMap[c] = (catMap[c] || 0) + (parseFloat(g.monto_usd) || 0);  // USD original
       });
@@ -1313,7 +1653,7 @@
       // Semanas: acumular USD original + Bs del día (monto_bs_dia, no recalculado)
       const semsUSD = { 1: 0, 2: 0, 3: 0, 4: 0 };
       const semsBsOrig = { 1: 0, 2: 0, 3: 0, 4: 0 };
-      S.gastos.forEach(g => {
+      gastosDelMes.forEach(g => {
         const d = new Date((g.fecha || '') + 'T00:00:00').getDate();
         const s = semDia(d);
         semsUSD[s] += parseFloat(g.monto_usd) || 0;
@@ -1339,8 +1679,6 @@
               tooltip: {
                 callbacks: {
                   label: ctx => {
-                    // USD: valor principal y exacto
-                    // Bs: referencia aproximada con tasa activa (solo orientativo)
                     const usd = ctx.raw;
                     const bsRef = bcv > 0 ? usd * bcv : 0;
                     return [
@@ -1361,10 +1699,10 @@
       CH.flow = new Chart(document.getElementById('ch-flow'), {
         type: 'bar',
         data: {
-          labels: ['Bono 1', 'Bono 2', 'Salario', 'Cesta', 'Ayuda', 'G.Variable', 'G.Fijos', 'Meta 40%'],
+          labels: ['Bono 1', 'Bono 2', 'Salario', 'Cesta', 'Ayuda', 'Ing. Extras', 'G.Variable', 'G.Fijos', 'Meta 40%'],
           datasets: [{
-            data: [...ingUSD, -totGasUSD, -totFijosUSD, metaUSD],
-            backgroundColor: ['#29b8b066', '#29b8b044', '#4a8ff066', '#c8a84b66', '#c8a84b44', '#e05c5c88', '#e05c5c55', '#44c97e88'],
+            data: [...ingUSD, totIngExtrasUSD, -totGasUSD, -totFijosUSD, metaUSD],
+            backgroundColor: ['#29b8b066', '#29b8b044', '#4a8ff066', '#c8a84b66', '#c8a84b44', '#29b8b0aa', '#e05c5c88', '#e05c5c55', '#44c97e88'],
             borderRadius: 5, borderWidth: 0,
           }]
         },
@@ -1403,7 +1741,6 @@
               borderWidth: 1.5, borderRadius: 5, yAxisID: 'y',
             },
             {
-              // Bs del día real — línea muy discreta, solo referencia
               label: 'Bs. (ref.)',
               data: Object.values(semsBsOrig),
               type: 'line',
@@ -1421,7 +1758,6 @@
             legend: {
               labels: {
                 color: tc, font: { size: 11 }, boxWidth: 10,
-                // Bs en leyenda también discreta
                 generateLabels: chart => chart.data.datasets.map((ds, i) => ({
                   text: ds.label,
                   fillStyle: i === 0 ? '#e05c5c' : 'rgba(200,168,75,.4)',
@@ -1436,8 +1772,8 @@
               callbacks: {
                 label: ctx =>
                   ctx.datasetIndex === 0
-                    ? `${fUSD(ctx.raw)}`           // USD: claro y exacto
-                    : `ref. Bs.${N(ctx.raw)}`      // Bs: referencia, prefijo "ref."
+                    ? `${fUSD(ctx.raw)}`
+                    : `ref. Bs.${N(ctx.raw)}`
               }
             }
           },
@@ -1454,12 +1790,13 @@
       const ingComp = [
         { l: 'Bono 1', v: usdFromBs(b1, bcv) }, { l: 'Bono 2', v: usdFromBs(b2, bcv) },
         { l: 'Salario', v: usdFromBs(sal, bcv) }, { l: 'Cesta', v: usdFromBs(cbs, bcv) }, { l: 'Ayuda', v: usdFromBs(ay, bcv) },
+        { l: 'Ingresos Extras', v: totIngExtrasUSD }
       ].filter(x => x.v > 0);
       if (ingComp.length) {
         const tot = ingComp.reduce((a, x) => a + x.v, 0);
         CH.ing = new Chart(document.getElementById('ch-ing'), {
           type: 'doughnut',
-          data: { labels: ingComp.map(x => x.l), datasets: [{ data: ingComp.map(x => x.v), backgroundColor: ['#c8a84b', '#c8a84b88', '#4a8ff0', '#29b8b0', '#29b8b088'], borderWidth: 0, hoverOffset: 6 }] },
+          data: { labels: ingComp.map(x => x.l), datasets: [{ data: ingComp.map(x => x.v), backgroundColor: ['#c8a84b', '#c8a84b88', '#4a8ff0', '#29b8b0', '#29b8b088', '#29b8b0cc'], borderWidth: 0, hoverOffset: 6 }] },
           options: {
             responsive: true, maintainAspectRatio: false,
             plugins: {
@@ -1681,6 +2018,8 @@
       if (pid === 'htasas') renderTasasList();
       if (pid === 'hsalarios') renderHistorialSalarios();
       if (pid === 'fijos') renderGastosFijos();
+      if (pid === 'ingresos') renderIngresos();
+      if (pid === 'ahorro') renderAhorro();
     }
 
     // ═══════════════════════════════════════════════════════════
