@@ -48,13 +48,6 @@
       } catch (e) { }
       return null;
     }
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-        flowType: 'pkce',
-      }
-    });
 
     let currentUser = null;
 
