@@ -328,7 +328,24 @@
                 <div class="mono gold" id="ing-tot-bs-sub" style="font-size:1.1rem; margin-top:.3rem;">— Bs.</div>
               </div>
               <div class="hr"></div>
-              <div class="xs muted">💡 Los ingresos extras se suman automáticamente al análisis de ahorro y saldo disponible del mes.</div>
+              <div class="xs muted" style="margin-bottom: 1rem;">💡 Los ingresos extras se suman automáticamente al análisis de ahorro y saldo disponible del mes.</div>
+              
+              <!-- Contenedores de gráficos -->
+              <div style="margin-top: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem;">
+                <div>
+                  <div class="xs muted" style="text-transform:uppercase; font-weight:600; letter-spacing:0.05em; margin-bottom:0.5rem; text-align:center;">Por Categoría</div>
+                  <div style="position:relative; height:180px;">
+                    <canvas id="ing-chart-cat"></canvas>
+                  </div>
+                </div>
+                <div class="hr"></div>
+                <div>
+                  <div class="xs muted" style="text-transform:uppercase; font-weight:600; letter-spacing:0.05em; margin-bottom:0.5rem; text-align:center;">Evolución Diaria del Mes</div>
+                  <div style="position:relative; height:180px;">
+                    <canvas id="ing-chart-dia"></canvas>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 

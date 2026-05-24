@@ -509,16 +509,18 @@
       if (accion === 'saveIngreso') {
         const { data, error } = await sb.from('ingresos')
           .insert({
-            id: body.id,
             fecha: body.fecha, descripcion: body.descripcion,
             categoria: body.categoria || 'Otro',
             monto_usd: +body.monto_usd, tasa_dia: +body.tasa_dia,
             monto_bs_dia: +body.monto_bs_dia,
             user_id: uid,
           })
-          .select()
+          .select('id')
           .single();
-        if (error) throw error;
+        if (error) {
+          console.error("Supabase insert error [ingresos]:", error);
+          throw error;
+        }
         return { status: 'ok', data: { saved: true, id: data.id } };
       }
 
@@ -624,15 +626,16 @@
       }
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  GUARDAR TASA BCV → SHEETS
-    // ═══════════════════════════════════════════════════════════
     async function saveBCV() {
       const tasa = parseFloat(document.getElementById('inp-bcv').value) || 0;
       const fecha = document.getElementById('inp-dt').value;
       if (!tasa || !fecha) { showStatus('cfg-status', 'error', '⚠ Ingresa tasa y fecha.'); return; }
       S.bcv = tasa; S.bcvDate = fecha; lsSave(); updateHdr(); liveCalc();
-      showStatus('cfg-status', 'loading', '⟳ Guardando en Sheets...');
+      
+      // Update UI immediately
+      renderResumen(); renderSemanal(); renderAhorro(); renderGastos();
+
+      showStatus('cfg-status', 'loading', '⟳ Guardando en base de datos...');
       setSyncState('loading', 'Guardando...');
       try {
         await apiPost('saveTasa', { fecha, tasa, fuente: 'BCV Oficial' });
@@ -645,8 +648,8 @@
         S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
         lsSave();
         poblarSelectorTasas();
-      } catch {
-        showStatus('cfg-status', 'warn', '⚠ Guardado local. Sin conexión con Sheets.');
+      } catch (err) {
+        showStatus('cfg-status', 'warn', '⚠ Guardado local. Sin conexión con la base de datos.');
         setSyncState('err', 'Sin conexión');
       }
     }
@@ -668,8 +671,20 @@
       const d = document.getElementById('m-dt').value;
       if (r > 0) {
         S.bcv = r; S.bcvDate = d; lsSave(); updateHdr(); liveCalc();
+        
+        // Refresh dependent views
+        renderResumen(); renderSemanal(); renderAhorro(); renderGastos();
+
         closeModal('modal-bcv');
-        try { await apiPost('saveTasa', { fecha: d, tasa: r, fuente: 'BCV Oficial' }); } catch { }
+        try {
+          await apiPost('saveTasa', { fecha: d, tasa: r, fuente: 'BCV Oficial' });
+          const idx = S.tasasHistoricas.findIndex(t => t.fecha === d);
+          if (idx >= 0) S.tasasHistoricas[idx].tasa = r;
+          else S.tasasHistoricas.unshift({ fecha: d, tasa: r, fuente: 'BCV Oficial' });
+          S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+          lsSave();
+          poblarSelectorTasas();
+        } catch { }
       }
     }
     document.querySelectorAll('.overlay').forEach(el =>
@@ -742,6 +757,7 @@
 
       if (!isBackground) {
         renderResumen(); renderSemanal(); renderAhorro(); renderGastos();
+        poblarSelectorTasas();
         nav(document.querySelectorAll('.nav-btn')[1], 'resumen');
       }
     }
@@ -1024,23 +1040,26 @@
       // No renderizamos todo lo demás a menos que sea necesario o en el próximo tick
       setTimeout(() => renderAhorro(), 10);
 
-      setSyncState('loading', 'Sincronizando...');
+      setSyncState('loading', 'Guardando...');
 
-      // Guardado en segundo plano (No bloqueante)
-      apiPost('saveGasto', {
-        fecha, descripcion: desc, categoria: cat,
-        monto_usd: montoUSD, tasa_dia: tasaDia, monto_bs_dia: montoBsDia, tipo: 'variable',
-      }).then(res => {
-        if (res && res.status === 'ok' && res.data && res.data.id) {
+      try {
+        const res = await apiPost('saveGasto', {
+          fecha, descripcion: desc, categoria: cat,
+          monto_usd: montoUSD, tasa_dia: tasaDia, monto_bs_dia: montoBsDia, tipo: 'variable',
+        });
+        if (res && res.status === 'ok') {
           const idxLocal = S.gastos.findIndex(g => g.id === gasto.id);
           if (idxLocal >= 0) S.gastos[idxLocal].id = res.data.id;
           lsSave();
           setSyncState('ok');
+        } else {
+          setSyncState('err', 'Pendiente de subir');
         }
-      }).catch(err => {
+      } catch (err) {
         console.error("Fallo sincro gasto:", err);
-        setSyncState('err', 'Pendiente de subir');
-      });
+        setSyncState('err', 'Sin conexión o error BD');
+        alert("Atención: El gasto se guardó localmente, pero hubo un error al sincronizar con la base de datos. Verifica la conexión o políticas RLS.");
+      }
     }
 
     function showGastoSyncStatus(type, msg) {
@@ -1347,23 +1366,26 @@
       renderIngresos();
       setTimeout(() => renderAhorro(), 10);
 
-      setSyncState('loading', 'Sincronizando...');
+      setSyncState('loading', 'Guardando...');
 
-      apiPost('saveIngreso', {
-        id: ingreso.id,
-        fecha, descripcion: desc, categoria: cat,
-        monto_usd: montoUSD, tasa_dia: tasaDia, monto_bs_dia: montoBsDia
-      }).then(res => {
+      try {
+        const res = await apiPost('saveIngreso', {
+          fecha, descripcion: desc, categoria: cat,
+          monto_usd: montoUSD, tasa_dia: tasaDia, monto_bs_dia: montoBsDia
+        });
         if (res && res.status === 'ok') {
           const idxLocal = S.ingresos.findIndex(i => i.id === ingreso.id);
           if (idxLocal >= 0) S.ingresos[idxLocal].id = res.data.id;
           lsSave();
           setSyncState('ok');
+        } else {
+          setSyncState('err', 'Pendiente de subir');
         }
-      }).catch(err => {
+      } catch (err) {
         console.error("Fallo sincro ingreso:", err);
-        setSyncState('err', 'Pendiente de subir');
-      });
+        setSyncState('err', 'Sin conexión o error BD');
+        alert("Atención: El ingreso se guardó localmente, pero hubo un error al sincronizar con la base de datos (Supabase). Revisa si las políticas RLS están configuradas.");
+      }
     }
 
     async function delIngresoExtra(id) {
@@ -1372,16 +1394,17 @@
       lsSave();
       renderIngresos(); renderAhorro();
 
-      setSyncState('loading', 'Borrando...');
+      setSyncState('loading', 'Borrando nube...');
       try {
         const res = await apiPost('deleteIngreso', { id });
         if (res && res.status === 'ok') {
           setSyncState('ok');
         } else {
-          setSyncState('ok');
+          setSyncState('err', 'Error al borrar');
         }
       } catch (err) {
-        setSyncState('err', 'Sin conexión — borrado solo localmente');
+        console.error("Fallo borrado ingreso nube:", err);
+        setSyncState('err', 'Borrado solo localmente');
       }
     }
 
@@ -1434,6 +1457,10 @@
       const sorted = [...ingresosDelMes].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''));
       const empty = document.getElementById('ing-empty'), list = document.getElementById('ing-list');
       if (!list) return;
+      // Map for Categories and Days
+      const catMap = {};
+      const diaMap = {};
+
       if (!sorted.length) {
         if (empty) empty.style.display = 'block';
         list.innerHTML = '';
@@ -1443,6 +1470,14 @@
           const usd = parseFloat(i.monto_usd) || 0;
           const bsDia = parseFloat(i.monto_bs_dia) || (usd * (parseFloat(i.tasa_dia) || S.bcv));
           const tasaDia = parseFloat(i.tasa_dia) || S.bcv;
+
+          // Populate chart maps
+          const c = i.categoria || 'Otro';
+          catMap[c] = (catMap[c] || 0) + usd;
+          
+          const dia = new Date((i.fecha || '') + 'T00:00:00').getDate() || 1;
+          diaMap[dia] = (diaMap[dia] || 0) + usd;
+
           return `<div style="display:flex;align-items:center;gap:.7rem;background:var(--navy3);border-radius:8px;padding:.65rem .9rem;margin-bottom:.4rem;">
         <div style="flex:1;min-width:0;">
           <div style="font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
@@ -1471,6 +1506,68 @@
       const totBs = ingresosDelMes.reduce((a, i) => a + (parseFloat(i.monto_bs_dia) || 0), 0);
       setEl('ing-tot-usd-main', fUSD(totUSD));
       setEl('ing-tot-bs-sub', fBs(totBs));
+
+      // ── RENDER CHARTS ──
+      const pal = ['#29b8b0', '#c8a84b', '#4a8ff0', '#44c97e', '#e05c5c', '#a78bfa', '#fb923c', '#f472b6', '#94a3b8'];
+      const gc = 'rgba(255,255,255,.04)', tc = '#8fa0be';
+      const tooltipOpts = {
+        callbacks: {
+          label: ctx => {
+            const usd = ctx.raw;
+            const bsRef = S.bcv > 0 ? usd * S.bcv : 0;
+            return [`${fUSD(usd)}`, bsRef > 0 ? `ref. Bs.${N(bsRef)}` : ''].filter(Boolean);
+          }
+        }
+      };
+
+      // 1. Doughnut Categories
+      if (CH.ingCat) CH.ingCat.destroy();
+      const ctxCat = document.getElementById('ing-chart-cat');
+      if (ctxCat && Object.keys(catMap).length) {
+        CH.ingCat = new Chart(ctxCat, {
+          type: 'doughnut',
+          data: {
+            labels: Object.keys(catMap),
+            datasets: [{ data: Object.values(catMap), backgroundColor: pal, borderWidth: 0, hoverOffset: 6 }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'right', labels: { color: tc, font: { size: 11 }, boxWidth: 10, padding: 8 } },
+              tooltip: tooltipOpts
+            }
+          }
+        });
+      }
+
+      // 2. Bar Daily Evolution
+      if (CH.ingDia) CH.ingDia.destroy();
+      const ctxDia = document.getElementById('ing-chart-dia');
+      if (ctxDia && Object.keys(diaMap).length) {
+        // Sort days numerically
+        const dias = Object.keys(diaMap).map(Number).sort((a, b) => a - b);
+        const dataDias = dias.map(d => diaMap[d]);
+        
+        CH.ingDia = new Chart(ctxDia, {
+          type: 'bar',
+          data: {
+            labels: dias.map(d => `Día ${d}`),
+            datasets: [{
+              data: dataDias,
+              backgroundColor: '#29b8b0aa', hoverBackgroundColor: '#29b8b0',
+              borderRadius: 4, borderWidth: 0
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: tooltipOpts },
+            scales: {
+              x: { grid: { color: gc }, ticks: { color: tc, font: { size: 10 } } },
+              y: { grid: { color: gc }, border: { display: false }, ticks: { color: tc, font: { size: 10 }, callback: v => '$' + v } }
+            }
+          }
+        });
+      }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -1497,14 +1594,19 @@
       setSyncState('loading', 'Guardando...');
       try {
         const res = await apiPost('saveGastoFijo', { descripcion: desc, categoria: cat, monto_usd: monto });
-        // Confirmar ID real de Sheets
-        if (res && res.data && res.data.id) {
+        if (res && res.status === 'ok') {
           const idx = S.gastosFijos.findIndex(g => g.id === fijo.id);
-          if (idx >= 0) S.gastosFijos[idx].id = res.data.id;
+          if (idx >= 0) S.gastosFijos[idx].id = res.data?.id || res.data?.data?.id || fijo.id;
           lsSave();
+          setSyncState('ok');
+        } else {
+          setSyncState('err', 'Pendiente');
         }
-        setSyncState('ok');
-      } catch { setSyncState('err', 'Sin conexión'); }
+      } catch (err) {
+        console.error("Fallo sincro fijo:", err);
+        setSyncState('err', 'Sin conexión o error BD');
+        alert("Atención: El gasto fijo se guardó localmente, pero hubo un error al sincronizar con la base de datos.");
+      }
     }
 
     async function delGastoFijo(id) {
