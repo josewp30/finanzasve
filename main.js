@@ -2252,8 +2252,6 @@
       window.handleSignIn = handleSignIn;
       window.handleSignUp = handleSignUp;
       window.toggleAuthMode = toggleAuthMode;
-      window.installPWA = installPWA;
-      window.applyUpdate = applyUpdate;
       window.hideLoading = hideLoading;
       window.openModal = openModal;
       window.signOut = signOut;
@@ -2288,6 +2286,7 @@
 
     // Auto-actualización SW
     let swWaitingWorker = null;
+    let deferredPrompt = null;
     function applyUpdate() {
       if (swWaitingWorker) {
         swWaitingWorker.postMessage({ type: 'SKIP_WAITING' });
@@ -2345,7 +2344,6 @@
       }
 
       // Prompt de instalación Android Chrome
-      let deferredPrompt = null;
       window.addEventListener('beforeinstallprompt', e => {
         e.preventDefault();
         deferredPrompt = e;
@@ -2357,15 +2355,16 @@
         const btn = document.getElementById('pwa-install-btn');
         if (btn) btn.style.display = 'none';
       });
-      window.installPWA = async () => {
-        if (!deferredPrompt) {
-          alert('En iPhone/iPad:\n1. Toca el botón Compartir \u{1F4E4}\n2. Selecciona "Añadir a pantalla de inicio"');
-          return;
-        }
-        await deferredPrompt.prompt();
-        deferredPrompt = null;
-        const btn = document.getElementById('pwa-install-btn');
-        if (btn) btn.style.display = 'none';
-      };
     })();
+
+    async function installPWA() {
+      if (!deferredPrompt) {
+        alert('En iPhone/iPad:\n1. Toca el botón Compartir \u{1F4E4}\n2. Selecciona "Añadir a pantalla de inicio"');
+        return;
+      }
+      await deferredPrompt.prompt();
+      deferredPrompt = null;
+      const btn = document.getElementById('pwa-install-btn');
+      if (btn) btn.style.display = 'none';
+    }
   
