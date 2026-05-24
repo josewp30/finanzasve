@@ -34,11 +34,24 @@
 
 
     async function signOut() {
-      localStorage.removeItem(LS_KEY);
-      appInitialized = false;
-      await sb.auth.signOut();
-      currentUser = null;
-      showAuthScreen();
+      // Intentar cerrar sesión en backend (puede fallar si expiró o no hay red)
+      try {
+        await sb.auth.signOut();
+      } catch (err) {
+        console.warn("Aviso al cerrar sesión en BD:", err);
+      } finally {
+        // Limpieza local incondicional
+        localStorage.removeItem(LS_KEY);
+        if (currentUser && currentUser.id) {
+          localStorage.removeItem('fve4_' + currentUser.id);
+        }
+        
+        appInitialized = false;
+        currentUser = null;
+        
+        // Forzar recarga completa para reiniciar variables y Service Workers enganchados
+        window.location.reload();
+      }
     }
 
     let appInitialized = false;
