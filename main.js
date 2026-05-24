@@ -509,6 +509,7 @@
       if (accion === 'saveIngreso') {
         const { data, error } = await sb.from('ingresos')
           .insert({
+            id: body.id,
             fecha: body.fecha, descripcion: body.descripcion,
             categoria: body.categoria || 'Otro',
             monto_usd: +body.monto_usd, tasa_dia: +body.tasa_dia,
@@ -1349,10 +1350,11 @@
       setSyncState('loading', 'Sincronizando...');
 
       apiPost('saveIngreso', {
+        id: ingreso.id,
         fecha, descripcion: desc, categoria: cat,
         monto_usd: montoUSD, tasa_dia: tasaDia, monto_bs_dia: montoBsDia
       }).then(res => {
-        if (res && res.status === 'ok' && res.data && res.data.id) {
+        if (res && res.status === 'ok') {
           const idxLocal = S.ingresos.findIndex(i => i.id === ingreso.id);
           if (idxLocal >= 0) S.ingresos[idxLocal].id = res.data.id;
           lsSave();
