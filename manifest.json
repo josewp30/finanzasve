@@ -2,7 +2,7 @@
   "name": "FinanzasVE",
   "short_name": "FinanzasVE",
   "description": "Gestor de finanzas personales venezolano",
-  "start_url": "./salario-venezuela.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0b1120",
   "theme_color": "#0b1120",

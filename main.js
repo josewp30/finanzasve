@@ -3,11 +3,51 @@
     //  SUPABASE — AUTH + DB
     // ═══════════════════════════════════════════════════════════
     const SB_URL = 'https://tdcpdjhwvpkrxgmnpftv.supabase.co';
-    // ⚠️ IMPORTANTE: Reemplaza esto con tu anon key real de Supabase.
-    // Encuéntrala en: supabase.com → tu proyecto → Settings → API → "anon public"
-    // Debe empezar con "eyJ..." (es un JWT largo)
-    const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkY3Bkamh3dnBrcnhnbW5wZnR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNTUwMzEsImV4cCI6MjA4ODkzMTAzMX0.YqdHUV2O0ELXd1wJJTzTRvNUA06G6F2xlLJ33T9lMD8';
-    const sb = supabase.createClient(SB_URL, SB_KEY, {
+    // ⚠️ IMPORTANTE: NO almacenar la anon key en el repo. Se carga dinámicamente.
+    // Opciones de carga (orden de preferencia):
+    // 1) window.__FVE_CONFIG__ (injección por build/server)
+    // 2) meta[name="supabase-anon-key"] en el HTML
+    // 3) ./config.json (local, no commitear)
+    // Si no se proporciona, el cliente se inicializa con key nula y la app funcionará en modo local.
+    let SB_KEY = null;
+    let sb = null;
+    function initSupabaseClient(key) {
+      try {
+        sb = supabase.createClient(SB_URL, key || '', {
+          auth: {
+            autoRefreshToken: true,
+            persistSession: true,
+            detectSessionInUrl: true,
+            flowType: 'pkce',
+          }
+        });
+      } catch (e) {
+        console.warn('No fue posible inicializar Supabase client:', e);
+      }
+    }
+
+    async function loadLocalConfig() {
+      // 1) window global
+      try {
+        if (window.__FVE_CONFIG__ && window.__FVE_CONFIG__.SB_KEY) {
+          return window.__FVE_CONFIG__.SB_KEY;
+        }
+      } catch (e) { }
+      // 2) meta tag
+      try {
+        const m = document.querySelector('meta[name="supabase-anon-key"]');
+        if (m && m.content) return m.content;
+      } catch (e) { }
+      // 3) config.json (optional, not commited)
+      try {
+        const r = await fetch('./config.json', { cache: 'no-store' });
+        if (r.ok) {
+          const j = await r.json();
+          if (j && j.SB_KEY) return j.SB_KEY;
+        }
+      } catch (e) { }
+      return null;
+    }
       auth: {
         autoRefreshToken: true,
         persistSession: true,
@@ -40,16 +80,33 @@
       } catch (err) {
         console.warn("Aviso al cerrar sesión en BD:", err);
       } finally {
-        // Limpieza local incondicional
+        // 1. Limpieza local incondicional (Nuestras llaves)
         localStorage.removeItem(LS_KEY);
         if (currentUser && currentUser.id) {
           localStorage.removeItem('fve4_' + currentUser.id);
         }
         
+        // 2. Limpieza incondicional de llaves de Supabase (El culpable del loop)
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+            localStorage.removeItem(key);
+          }
+        });
+        
         appInitialized = false;
         currentUser = null;
         
-        // Forzar recarga completa para reiniciar variables y Service Workers enganchados
+        // 3. Destruir Service Workers activos para matar el caché retenido
+        if ('serviceWorker' in navigator) {
+          try {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (let r of regs) { await r.unregister(); }
+          } catch (e) {
+            console.warn("No se pudo desregistrar SW:", e);
+          }
+        }
+        
+        // 4. Recargar limpiamente
         window.location.reload();
       }
     }
@@ -2184,13 +2241,28 @@
       if (forceBtnTimer) clearTimeout(forceBtnTimer);
     }
 
-    // Ejecutar listener de auth de inmediato para capturar redirect de Supabase
-    onAuthStateChange();
+    // Migrar handlers inline a listeners y luego inicializar Supabase y auth
+    function migrateInlineHandlers() {
+      try {
+        document.querySelectorAll('[onclick]').forEach(el => {
+          const code = el.getAttribute('onclick');
+          if (!code) return;
+          el.removeAttribute('onclick');
+          el.addEventListener('click', (e) => {
+            try { (0, eval)(code); } catch (err) { console.error('Error ejecutando handler migrado:', err); }
+          });
+        });
+      } catch (e) { console.warn('No se pudo migrar todos los handlers inline:', e); }
+    }
 
-    // window.onload para lógica adicional si es necesaria
-    window.onload = () => {
-      // Ya no se llama aquí onAuthStateChange()
-    };
+    (async function bootstrap() {
+      migrateInlineHandlers();
+      SB_KEY = await loadLocalConfig();
+      if (!SB_KEY) console.warn('Supabase anon key no encontrada. Conecta mediante window.__FVE_CONFIG__ o ./config.json');
+      initSupabaseClient(SB_KEY);
+      // Inicializar el listener de auth ahora que el cliente está listo
+      try { onAuthStateChange(); } catch (e) { console.warn('onAuthStateChange fallo:', e); }
+    })();
 
     // ═══════════════════════════════════════════════════════════
     //  PWA — Service Worker externo + Install prompt
