@@ -2248,8 +2248,21 @@
       } catch (e) { console.warn('No se pudo migrar todos los handlers inline:', e); }
     }
 
+    function exposeGlobalHandlers() {
+      window.handleSignIn = handleSignIn;
+      window.handleSignUp = handleSignUp;
+      window.toggleAuthMode = toggleAuthMode;
+      window.installPWA = installPWA;
+      window.applyUpdate = applyUpdate;
+      window.hideLoading = hideLoading;
+      window.openModal = openModal;
+      window.signOut = signOut;
+      window.nav = nav;
+    }
+
     (async function bootstrap() {
       migrateInlineHandlers();
+      exposeGlobalHandlers();
       SB_KEY = await loadLocalConfig();
       if (!SB_KEY) console.warn('Supabase anon key no encontrada. Conecta mediante window.__FVE_CONFIG__ o ./config.json');
       initSupabaseClient(SB_KEY);

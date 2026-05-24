@@ -1,4 +1,4 @@
-const CACHE_NAME = 'fve-static-v1';
+const CACHE_NAME = 'fve-static-v2';
 const PRECACHE_URLS = [
     './',
     './index.html',
