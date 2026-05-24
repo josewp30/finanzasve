@@ -12,8 +12,12 @@
     let SB_KEY = null;
     let sb = null;
     function initSupabaseClient(key) {
+      if (!key) {
+        sb = null;
+        return;
+      }
       try {
-        sb = supabase.createClient(SB_URL, key || '', {
+        sb = supabase.createClient(SB_URL, key, {
           auth: {
             autoRefreshToken: true,
             persistSession: true,
@@ -22,6 +26,7 @@
           }
         });
       } catch (e) {
+        sb = null;
         console.warn('No fue posible inicializar Supabase client:', e);
       }
     }
@@ -38,12 +43,14 @@
         const m = document.querySelector('meta[name="supabase-anon-key"]');
         if (m && m.content) return m.content;
       } catch (e) { }
-      // 3) config.json (optional, not commited)
+      // 3) config.json (optional, not committed; only used en local/dev para evitar 404 en deploys)
       try {
-        const r = await fetch('./config.json', { cache: 'no-store' });
-        if (r.ok) {
-          const j = await r.json();
-          if (j && j.SB_KEY) return j.SB_KEY;
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.protocol === 'file:') {
+          const r = await fetch('./config.json', { cache: 'no-store' });
+          if (r.ok) {
+            const j = await r.json();
+            if (j && j.SB_KEY) return j.SB_KEY;
+          }
         }
       } catch (e) { }
       return null;
@@ -53,12 +60,14 @@
 
     // ── Auth helpers ──────────────────────────────────────────
     async function signUp(email, password) {
+      if (!sb) throw new Error('Supabase no inicializado. Revisa la anon key.');
       const { data, error } = await sb.auth.signUp({ email, password });
       if (error) throw new Error(error.message);
       return data;
     }
 
     async function signIn(email, password) {
+      if (!sb) throw new Error('Supabase no inicializado. Revisa la anon key.');
       const { data, error } = await sb.auth.signInWithPassword({ email, password });
       if (error) throw new Error(error.message);
       return data;
@@ -2262,10 +2271,15 @@
       migrateInlineHandlers();
       exposeGlobalHandlers();
       SB_KEY = await loadLocalConfig();
-      if (!SB_KEY) console.warn('Supabase anon key no encontrada. Conecta mediante window.__FVE_CONFIG__ o ./config.json');
+      if (!SB_KEY) {
+        console.warn('Supabase anon key no encontrada. Conecta mediante window.__FVE_CONFIG__ o ./config.json');
+      }
       initSupabaseClient(SB_KEY);
-      // Inicializar el listener de auth ahora que el cliente está listo
-      try { onAuthStateChange(); } catch (e) { console.warn('onAuthStateChange fallo:', e); }
+      if (sb && sb.auth) {
+        try { onAuthStateChange(); } catch (e) { console.warn('onAuthStateChange fallo:', e); }
+      } else {
+        console.warn('Supabase no inicializado, la autenticación está deshabilitada.');
+      }
     })();
 
     // ═══════════════════════════════════════════════════════════
