@@ -224,7 +224,8 @@
             appInitialized = true;
             await initApp();
           }
-        } else if (event === 'SIGNED_OUT' || (!session && event !== 'INITIAL_SESSION')) {
+        } else if (!session) {
+          // No hay sesión: sea INITIAL_SESSION, SIGNED_OUT, o cualquier otro evento
           currentUser = null;
           appInitialized = false;
           isInitializing = false;
@@ -235,6 +236,7 @@
 
     // ── Auth UI ───────────────────────────────────────────────
     function showAuthScreen() {
+      hideLoading(); // Quitar el overlay de carga para mostrar el login
       document.getElementById('auth-screen').style.display = 'flex';
       document.getElementById('main-app').style.display = 'none';
     }
