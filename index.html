@@ -28,7 +28,7 @@
 <body>
 
   <!-- LOADING -->
-  <div class="loading-overlay" id="loading-overlay">
+  <div class="loading-overlay open" id="loading-overlay">
     <div class="spinner"></div>
     <div style="font-size:.85rem;color:var(--text2);margin-top:1rem;" id="loading-msg">Conectando...</div>
     <!-- Botón de emergencia si tarda más de 5s -->
@@ -37,6 +37,7 @@
       Cancelar espera</button>
   </div>
 
+  <div id="main-app" style="display:none;flex-direction:column;">
   <!-- TOP BAR -->
   <div class="topbar">
     <div class="logo">FINANZAS<span>VE</span></div>
@@ -84,7 +85,6 @@
       style="padding:.35rem .6rem;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text2);font-family:'IBM Plex Sans',sans-serif;font-size:.8rem;cursor:pointer;">Luego</button>
   </div>
 
-  <div id="main-app" style="display:none;flex-direction:column;">
     <div class="layout">
       <nav class="sidebar">
         <div class="nav-sec">Principal</div>
