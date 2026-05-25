@@ -7,36 +7,45 @@
     // Encuéntrala en: supabase.com → tu proyecto → Settings → API → "anon public"
     // Debe empezar con "eyJ..." (es un JWT largo)
     const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkY3Bkamh3dnBrcnhnbW5wZnR2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMzNTUwMzEsImV4cCI6MjA4ODkzMTAzMX0.YqdHUV2O0ELXd1wJJTzTRvNUA06G6F2xlLJ33T9lMD8';
-    const sb = supabase.createClient(SB_URL, SB_KEY, {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true,
-        flowType: 'pkce',
+    let sb = null;
+    if (typeof supabase !== 'undefined') {
+      try {
+        sb = supabase.createClient(SB_URL, SB_KEY, {
+          auth: {
+            autoRefreshToken: true,
+            persistSession: true,
+            detectSessionInUrl: true,
+            flowType: 'pkce',
+          }
+        });
+      } catch (err) {
+        console.error("Error al inicializar Supabase:", err);
       }
-    });
+    } else {
+      console.warn("Supabase no está disponible (ejecutando en modo offline).");
+    }
 
     let currentUser = null;
 
     // ── Auth helpers ──────────────────────────────────────────
     async function signUp(email, password) {
+      if (!sb) throw new Error('El servicio de base de datos no está disponible.');
       const { data, error } = await sb.auth.signUp({ email, password });
       if (error) throw new Error(error.message);
       return data;
     }
 
     async function signIn(email, password) {
+      if (!sb) throw new Error('El servicio de base de datos no está disponible.');
       const { data, error } = await sb.auth.signInWithPassword({ email, password });
       if (error) throw new Error(error.message);
       return data;
     }
 
-
-
     async function signOut() {
       // Intentar cerrar sesión en backend (puede fallar si expiró o no hay red)
       try {
-        await sb.auth.signOut();
+        if (sb) await sb.auth.signOut();
       } catch (err) {
         console.warn("Aviso al cerrar sesión en BD:", err);
       } finally {
@@ -205,6 +214,20 @@
     }
 
     function onAuthStateChange() {
+      if (!sb) {
+        console.warn("Supabase no disponible. Saltando a la interfaz local.");
+        currentUser = null;
+        appInitialized = false;
+        isInitializing = false;
+        showAuthScreen();
+        
+        // Agregar banner de advertencia de modo local/offline
+        const errEl = document.getElementById('auth-err');
+        if (errEl) {
+          showAuthErr("Modo Local: El servicio de base de datos no está disponible. Puedes usar la app en modo local, pero los datos no se sincronizarán en la nube.", "ok");
+        }
+        return;
+      }
       sb.auth.onAuthStateChange(async (event, session) => {
         if (session && session.user) {
           currentUser = session.user;
@@ -353,6 +376,7 @@
     async function apiGet(accion, params = {}) {
       const uid = currentUser?.id;
       if (!uid) return { status: 'err', data: [] };
+      if (!sb) return { status: 'err', msg: 'Offline', data: [] };
 
       try {
         if (accion === 'getTasas') {
@@ -441,6 +465,7 @@
     async function apiPost(accion, body = {}) {
       const uid = currentUser?.id;
       if (!uid) throw new Error('No autenticado');
+      if (!sb) throw new Error('El servicio de base de datos no está disponible.');
 
       // ── GUARDAR TASA BCV (upsert por fecha + user_id) ──────
       if (accion === 'saveTasa') {

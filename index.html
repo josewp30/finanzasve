@@ -20,8 +20,8 @@
   <link
     href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap"
     rel="stylesheet">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="chart.umd.min.js"></script>
+  <script src="supabase.min.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 
@@ -31,10 +31,20 @@
   <div class="loading-overlay open" id="loading-overlay">
     <div class="spinner"></div>
     <div style="font-size:.85rem;color:var(--text2);margin-top:1rem;" id="loading-msg">Conectando...</div>
-    <!-- Botón de emergencia si tarda más de 5s -->
-    <button id="btn-force-close" onclick="hideLoading()"
+    <!-- Botón de emergencia si tarda más de 5s o falla la carga del script -->
+    <button id="btn-force-close" onclick="document.getElementById('loading-overlay').classList.remove('open'); var auth = document.getElementById('auth-screen'); if (auth) auth.style.display = 'flex';"
       style="margin-top:2rem;background:transparent;border:1px solid var(--border);color:var(--text2);padding:.5rem 1rem;border-radius:20px;font-size:.7rem;cursor:pointer;display:none;z-index:9999;">✕
       Cancelar espera</button>
+    <script>
+      // Temporizador de seguridad independiente (inline) por si falla o tarda en cargar el JS
+      setTimeout(function() {
+        var btn = document.getElementById('btn-force-close');
+        var overlay = document.getElementById('loading-overlay');
+        if (btn && overlay && overlay.classList.contains('open')) {
+          btn.style.display = 'inline-block';
+        }
+      }, 3500);
+    </script>
   </div>
 
   <div id="main-app" style="display:none;flex-direction:column;">
