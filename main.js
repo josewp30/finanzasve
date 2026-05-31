@@ -43,41 +43,36 @@
     }
 
     async function signOut() {
-      // Intentar cerrar sesión en backend (puede fallar si expiró o no hay red)
-      try {
-        if (sb) await sb.auth.signOut();
-      } catch (err) {
-        console.warn("Aviso al cerrar sesión en BD:", err);
-      } finally {
-        // 1. Limpieza local incondicional (Nuestras llaves)
-        localStorage.removeItem(LS_KEY);
-        if (currentUser && currentUser.id) {
-          localStorage.removeItem('fve4_' + currentUser.id);
-        }
-        
-        // 2. Limpieza incondicional de llaves de Supabase (El culpable del loop)
-        Object.keys(localStorage).forEach(key => {
-          if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
-            localStorage.removeItem(key);
-          }
-        });
-        
-        appInitialized = false;
-        currentUser = null;
-        
-        // 3. Destruir Service Workers activos para matar el caché retenido
-        if ('serviceWorker' in navigator) {
-          try {
-            const regs = await navigator.serviceWorker.getRegistrations();
-            for (let r of regs) { await r.unregister(); }
-          } catch (e) {
-            console.warn("No se pudo desregistrar SW:", e);
-          }
-        }
-        
-        // 4. Recargar limpiamente
-        window.location.reload();
+      // 1. Intentar cerrar sesión en el backend en segundo plano (sin bloquear al usuario)
+      if (sb) {
+        sb.auth.signOut().catch(err => console.warn("Aviso al cerrar sesión en BD:", err));
       }
+      
+      // 2. Intentar desregistrar Service Workers en segundo plano (sin bloquear al usuario)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(regs => {
+          for (let r of regs) { r.unregister().catch(() => {}); }
+        }).catch(e => console.warn("No se pudo desregistrar SW:", e));
+      }
+      
+      // 3. Limpieza local incondicional (Nuestras llaves) de inmediato
+      localStorage.removeItem(LS_KEY);
+      if (currentUser && currentUser.id) {
+        localStorage.removeItem('fve4_' + currentUser.id);
+      }
+      
+      // 4. Limpieza incondicional de llaves de Supabase
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+          localStorage.removeItem(key);
+        }
+      });
+      
+      appInitialized = false;
+      currentUser = null;
+      
+      // 5. Recargar limpiamente de inmediato
+      window.location.reload();
     }
 
     let appInitialized = false;
