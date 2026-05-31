@@ -687,10 +687,19 @@
       const tasa = parseFloat(document.getElementById('inp-bcv').value) || 0;
       const fecha = document.getElementById('inp-dt').value;
       if (!tasa || !fecha) { showStatus('cfg-status', 'error', '⚠ Ingresa tasa y fecha.'); return; }
+      
+      // Guardar en caché y localStorage local incondicionalmente de inmediato
+      const idx = S.tasasHistoricas.findIndex(t => t.fecha === fecha);
+      if (idx >= 0) S.tasasHistoricas[idx].tasa = tasa;
+      else S.tasasHistoricas.unshift({ fecha, tasa, fuente: 'BCV Oficial' });
+      S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+      
       S.bcv = tasa; S.bcvDate = fecha; lsSave(); updateHdr(); liveCalc();
       
-      // Update UI immediately
+      // Actualizar UI inmediatamente
       renderResumen(); renderSemanal(); renderAhorro(); renderGastos();
+      poblarSelectorTasas();
+      renderTasasList();
 
       showStatus('cfg-status', 'loading', '⟳ Guardando en base de datos...');
       setSyncState('loading', 'Guardando...');
@@ -698,13 +707,6 @@
         await apiPost('saveTasa', { fecha, tasa, fuente: 'BCV Oficial' });
         showStatus('cfg-status', 'ok', `✓ Tasa Bs. ${N(tasa)} guardada para ${fecha}`);
         setSyncState('ok');
-        // Actualizar caché local
-        const idx = S.tasasHistoricas.findIndex(t => t.fecha === fecha);
-        if (idx >= 0) S.tasasHistoricas[idx].tasa = tasa;
-        else S.tasasHistoricas.unshift({ fecha, tasa, fuente: 'BCV Oficial' });
-        S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
-        lsSave();
-        poblarSelectorTasas();
       } catch (err) {
         showStatus('cfg-status', 'warn', '⚠ Guardado local. Sin conexión con la base de datos.');
         setSyncState('err', 'Sin conexión');
@@ -727,20 +729,22 @@
       const r = parseFloat(document.getElementById('m-bcv').value) || 0;
       const d = document.getElementById('m-dt').value;
       if (r > 0) {
+        // Guardar en caché y localStorage local incondicionalmente de inmediato
+        const idx = S.tasasHistoricas.findIndex(t => t.fecha === d);
+        if (idx >= 0) S.tasasHistoricas[idx].tasa = r;
+        else S.tasasHistoricas.unshift({ fecha: d, tasa: r, fuente: 'BCV Oficial' });
+        S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+        
         S.bcv = r; S.bcvDate = d; lsSave(); updateHdr(); liveCalc();
         
         // Refresh dependent views
         renderResumen(); renderSemanal(); renderAhorro(); renderGastos();
+        poblarSelectorTasas();
+        renderTasasList();
 
         closeModal('modal-bcv');
         try {
           await apiPost('saveTasa', { fecha: d, tasa: r, fuente: 'BCV Oficial' });
-          const idx = S.tasasHistoricas.findIndex(t => t.fecha === d);
-          if (idx >= 0) S.tasasHistoricas[idx].tasa = r;
-          else S.tasasHistoricas.unshift({ fecha: d, tasa: r, fuente: 'BCV Oficial' });
-          S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
-          lsSave();
-          poblarSelectorTasas();
         } catch { }
       }
     }
@@ -2026,6 +2030,31 @@
       renderResumen();
     }
 
+    window.guardarTasaEnBD = async function(fecha, tasa, fuente) {
+      showStatus('ht-status', 'loading', '⟳ Sincronizando tasa con la base de datos...');
+      try {
+        await apiPost('saveTasa', { fecha, tasa, fuente });
+        showStatus('ht-status', 'ok', `
+          <div style="display:flex;flex-direction:column;gap:0.4rem;">
+            <div>✓ Tasa del ${fecha} (Bs. ${N(tasa)}) <strong>sincronizada en la nube</strong>.</div>
+            <div style="display:flex;gap:0.5rem;margin-top:0.25rem;">
+              <button class="btn btn-t btn-sm" onclick="usarTasaHistorica('${fecha}', ${tasa})">Usar como activa</button>
+            </div>
+          </div>
+        `);
+      } catch (err) {
+        showStatus('ht-status', 'error', `
+          <div style="display:flex;flex-direction:column;gap:0.4rem;">
+            <div>⚠ No se pudo sincronizar la tasa con la base de datos. Guardada localmente.</div>
+            <div style="display:flex;gap:0.5rem;margin-top:0.25rem;">
+              <button class="btn btn-p btn-sm" onclick="guardarTasaEnBD('${fecha}', ${tasa}, '${fuente}')">Reintentar guardar en BD</button>
+              <button class="btn btn-t btn-sm" onclick="usarTasaHistorica('${fecha}', ${tasa})">Usar como activa</button>
+            </div>
+          </div>
+        `);
+      }
+    };
+
     async function buscarTasaHistorica() {
       const fecha = document.getElementById('ht-fecha').value;
       if (!fecha) { alert('Selecciona una fecha.'); return; }
@@ -2034,22 +2063,62 @@
       // Primero buscar en caché local
       const local = S.tasasHistoricas.find(t => t.fecha === fecha);
       if (local) {
-        showStatus('ht-status', 'ok', `✓ Encontrada en historial local: Bs. ${N(local.tasa)} / USD`);
+        showStatus('ht-status', 'ok', `
+          <div style="display:flex;flex-direction:column;gap:0.4rem;">
+            <div>✓ Encontrada en historial local: <strong>Bs. ${N(local.tasa)} / USD</strong> · ${local.fecha}</div>
+            <div style="display:flex;gap:0.5rem;margin-top:0.25rem;">
+              <button class="btn btn-t btn-sm" onclick="usarTasaHistorica('${local.fecha}', ${local.tasa})">Usar como activa</button>
+            </div>
+          </div>
+        `);
         return;
       }
 
       // Buscar en API histórica de dolarapi.com
       const resultado = await fetchTasaHistoricaAPI(fecha);
       if (resultado) {
-        showStatus('ht-status', 'ok', `✓ Encontrada en API: Bs. ${N(resultado.rate)} / USD · ${resultado.fecha}`);
-        // Guardar en Sheets automáticamente
+        // Guardar en caché y localStorage local incondicionalmente de inmediato
+        const idx = S.tasasHistoricas.findIndex(t => t.fecha === resultado.fecha);
+        if (idx >= 0) S.tasasHistoricas[idx].tasa = resultado.rate;
+        else S.tasasHistoricas.unshift({ fecha: resultado.fecha, tasa: resultado.rate, fuente: resultado.fuente || 'API BCV' });
+        S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+        lsSave(); 
+        renderTasasList(); 
+        poblarSelectorTasas();
+
+        // Mostrar estatus con opciones claras
+        showStatus('ht-status', 'ok', `
+          <div style="display:flex;flex-direction:column;gap:0.4rem;">
+            <div>✓ Encontrada en API: <strong>Bs. ${N(resultado.rate)} / USD</strong> · ${resultado.fecha}</div>
+            <div style="display:flex;gap:0.5rem;margin-top:0.25rem;">
+              <button class="btn btn-p btn-sm" onclick="guardarTasaEnBD('${resultado.fecha}', ${resultado.rate}, '${resultado.fuente || 'API BCV'}')">✓ Guardar en BD</button>
+              <button class="btn btn-t btn-sm" onclick="usarTasaHistorica('${resultado.fecha}', ${resultado.rate})">Usar como activa</button>
+            </div>
+          </div>
+        `);
+
+        // Intentar guardar en base de datos en segundo plano automáticamente
         try {
-          await apiPost('saveTasa', { fecha: resultado.fecha, tasa: resultado.rate, fuente: resultado.fuente });
-          S.tasasHistoricas.unshift({ fecha: resultado.fecha, tasa: resultado.rate, fuente: resultado.fuente });
-          S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
-          lsSave(); renderTasasList(); poblarSelectorTasas();
-          showStatus('ht-status', 'ok', `✓ Tasa ${resultado.fecha}: Bs. ${N(resultado.rate)} guardada automáticamente.`);
-        } catch { showStatus('ht-status', 'warn', `⚠ Tasa encontrada (${N(resultado.rate)}) pero no se pudo guardar en Sheets.`); }
+          await apiPost('saveTasa', { fecha: resultado.fecha, tasa: resultado.rate, fuente: resultado.fuente || 'API BCV' });
+          showStatus('ht-status', 'ok', `
+            <div style="display:flex;flex-direction:column;gap:0.4rem;">
+              <div>✓ Tasa del ${resultado.fecha} (Bs. ${N(resultado.rate)}) <strong>guardada con éxito</strong> en la nube.</div>
+              <div style="display:flex;gap:0.5rem;margin-top:0.25rem;">
+                <button class="btn btn-t btn-sm" onclick="usarTasaHistorica('${resultado.fecha}', ${resultado.rate})">Usar como activa</button>
+              </div>
+            </div>
+          `);
+        } catch (err) {
+          showStatus('ht-status', 'warn', `
+            <div style="display:flex;flex-direction:column;gap:0.4rem;">
+              <div>✓ Tasa del ${resultado.fecha} (Bs. ${N(resultado.rate)}) <strong>guardada localmente</strong> (Modo offline).</div>
+              <div style="display:flex;gap:0.5rem;margin-top:0.25rem;">
+                <button class="btn btn-p btn-sm" onclick="guardarTasaEnBD('${resultado.fecha}', ${resultado.rate}, '${resultado.fuente || 'API BCV'}')">⟳ Reintentar guardar en BD</button>
+                <button class="btn btn-t btn-sm" onclick="usarTasaHistorica('${resultado.fecha}', ${resultado.rate})">Usar como activa</button>
+              </div>
+            </div>
+          `);
+        }
       } else {
         showStatus('ht-status', 'error', `⚠ No se encontró tasa para ${fecha} en la API. Intenta otra fecha o ingrésala manualmente.`);
       }
@@ -2057,19 +2126,27 @@
 
     async function guardarTasaManual() {
       const fecha = document.getElementById('ht-fecha').value;
+      if (!fecha) { alert('Selecciona una fecha.'); return; }
       const statusEl = document.getElementById('ht-status');
       statusEl.style.display = 'block';
-      const tasa = prompt(`Ingresa la tasa BCV manualmente para ${fecha || 'la fecha seleccionada'} (Bs. por USD):`);
+      const tasa = prompt(`Ingresa la tasa BCV manualmente para ${fecha} (Bs. por USD):`);
       if (!tasa || isNaN(parseFloat(tasa))) return;
       const t = parseFloat(tasa);
       showStatus('ht-status', 'loading', '⟳ Guardando...');
+      
+      // Guardar localmente incondicionalmente
+      const idx = S.tasasHistoricas.findIndex(item => item.fecha === fecha);
+      if (idx >= 0) S.tasasHistoricas[idx].tasa = t;
+      else S.tasasHistoricas.unshift({ fecha, tasa: t, fuente: 'Manual' });
+      S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+      lsSave(); renderTasasList(); poblarSelectorTasas();
+      
       try {
         await apiPost('saveTasa', { fecha, tasa: t, fuente: 'Manual' });
-        S.tasasHistoricas.unshift({ fecha, tasa: t, fuente: 'Manual' });
-        S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
-        lsSave(); renderTasasList(); poblarSelectorTasas();
         showStatus('ht-status', 'ok', `✓ Tasa manual Bs. ${N(t)} para ${fecha} guardada.`);
-      } catch { showStatus('ht-status', 'error', '⚠ Error guardando en Sheets.'); }
+      } catch (err) {
+        showStatus('ht-status', 'warn', `⚠ Tasa manual Bs. ${N(t)} guardada localmente. Sin conexión.`);
+      }
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -2196,7 +2273,7 @@
         error: 'background:rgba(224,92,92,.08);color:var(--red);border:1px solid rgba(224,92,92,.2);',
       };
       el.style.cssText = 'display:block;margin-top:.9rem;font-size:.8rem;padding:.7rem 1rem;border-radius:8px;' + (styles[type] || styles.ok);
-      el.textContent = msg;
+      el.innerHTML = msg;
     }
     let loadingTimer = null;
     let forceBtnTimer = null;
