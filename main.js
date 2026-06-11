@@ -594,8 +594,14 @@
 
       // ── EDITAR REGISTRO ────────────────────────────
       if (accion === 'editRegistro') {
-        const updateData = { descripcion: body.descripcion, monto_usd: +body.monto_usd };
-        if (body.categoria) updateData.categoria = body.categoria;
+        const updateData = { monto_usd: +body.monto_usd };
+        
+        if (body.table === 'deudas') {
+          updateData.nombre = body.descripcion; // En la UI usamos descripcion, lo mapeamos a nombre
+        } else {
+          updateData.descripcion = body.descripcion;
+          if (body.categoria) updateData.categoria = body.categoria;
+        }
         
         const { error } = await sb.from(body.table)
           .update(updateData)
@@ -1809,15 +1815,21 @@
       if (table === 'gastos') { arr = S.gastos; renderFunc = renderGastos; }
       else if (table === 'gastos_fijos') { arr = S.gastosFijos; renderFunc = renderGastosFijos; }
       else if (table === 'ingresos') { arr = S.ingresos; renderFunc = renderIngresos; }
+      else if (table === 'deudas') { arr = S.deudas; renderFunc = renderDeudas; }
       
       const idx = arr.findIndex(x => x.id === id);
       if (idx >= 0) {
-        arr[idx].descripcion = desc;
+        if (table === 'deudas') {
+          arr[idx].nombre = desc;
+        } else {
+          arr[idx].descripcion = desc;
+          if (cat) arr[idx].categoria = cat;
+        }
         arr[idx].monto_usd = monto;
-        if (cat) arr[idx].categoria = cat;
         lsSave();
         renderFunc();
         renderAhorro();
+        renderDashboard(); // Para que el dashboard se actualice al editar
       }
       closeModal('modal-edit');
       
@@ -2520,6 +2532,8 @@
       const htmlDeuda = (d) => {
         const usd = parseFloat(d.monto_usd) || 0;
         const bs = usd * bcv;
+        // Escapamos comillas simples/dobles por seguridad en el onclick
+        const safeNombre = (d.nombre || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         return `<div style="display:flex;align-items:center;gap:.7rem;background:var(--navy3);border-radius:8px;padding:.65rem .9rem;margin-bottom:.4rem;">
           <div style="flex:1;">
             <div style="font-size:.85rem;font-weight:600;">${d.nombre || ''}</div>
@@ -2529,6 +2543,7 @@
             <div class="mono teal" style="font-weight:500;">${fUSD(usd)}</div>
             <div class="mono gold xs">Bs. ${N(bs)}</div>
           </div>
+          <button class="btn btn-sm" style="background:var(--navy2);border:1px solid rgba(255,255,255,.1);" onclick="openEditModal('deudas', '${d.id}', '${safeNombre}', ${usd})">✎</button>
           <button class="btn btn-d btn-sm" onclick="delDeudaLocal('${d.id}')">✕</button>
         </div>`;
       };
