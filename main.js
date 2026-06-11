@@ -2548,27 +2548,40 @@
       if (!elBalUsd) return; // Not on DOM
 
       const bcv = S.bcv || 0;
+      const currentMonth = new Date().toISOString().substring(0, 7); // YYYY-MM
+      
+      const mesesLabels = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+      const mIdx = parseInt(currentMonth.split('-')[1]) - 1;
+      setEl('dash-mes-label', `— ${mesesLabels[mIdx]} ${currentMonth.split('-')[0]}`);
 
-      // Gastos Fijos
+      // Filtros del Mes
+      const isThisMonth = (item) => String(item.fecha || '').startsWith(currentMonth);
+
+      // Gastos Fijos (Estos son fijos, asumimos que se pagan cada mes)
       const totFijosUsd = (S.gastosFijos || []).reduce((a, b) => a + (parseFloat(b.monto_usd) || 0), 0);
       setEl('dash-fijos-usd', fUSD(totFijosUsd));
       setEl('dash-fijos-bs', `Bs. ${N(totFijosUsd * bcv)}`);
 
-      // Ingresos Extras Totales
-      const totIngUsd = (S.ingresos || []).reduce((a, b) => a + (parseFloat(b.monto_usd) || 0), 0);
+      // Ingresos Extras Totales (Solo este mes)
+      const totIngUsd = (S.ingresos || []).filter(isThisMonth).reduce((a, b) => a + (parseFloat(b.monto_usd) || 0), 0);
       
-      // Salario Activo
+      // Salario Activo (Solo el salario registrado en este mes)
       let totSalUsd = 0;
-      if (S.salarios && S.salarios.length) {
-        const last = S.salarios[0];
-        totSalUsd = parseFloat(last.total_usd) || 0;
+      const salariosMes = (S.salarios || []).filter(isThisMonth);
+      if (salariosMes.length) {
+        totSalUsd = parseFloat(salariosMes[0].total_usd) || 0;
       }
 
-      // Gastos Variables Acumulados
-      const totGUsd = (S.gastos || []).reduce((a, b) => a + (parseFloat(b.monto_usd) || 0), 0);
+      // Gastos Variables Acumulados (Solo este mes)
+      const totGUsd = (S.gastos || []).filter(isThisMonth).reduce((a, b) => a + (parseFloat(b.monto_usd) || 0), 0);
 
-      // Balance General: (Ingresos + Salario) - GastosFijos - GastosVariables
-      const balanceUsd = (totSalUsd + totIngUsd) - (totFijosUsd + totGUsd);
+      // Ingresos Totales del Mes
+      const totalIngresosMes = totSalUsd + totIngUsd;
+      // Gastos Totales del Mes
+      const totalGastosMes = totFijosUsd + totGUsd;
+
+      // Balance General Mensual
+      const balanceUsd = totalIngresosMes - totalGastosMes;
       elBalUsd.textContent = fUSD(balanceUsd);
       setEl('dash-balance-bs', `Bs. ${N(balanceUsd * bcv)}`);
 
@@ -2579,12 +2592,61 @@
       setEl('dash-cobrar', fUSD(cobrarUsd));
       setEl('dash-pagar', fUSD(pagarUsd));
 
-      // Ahorro
+      // Ahorro (Total Acumulado, no se filtra por mes porque el ahorro es un fondo global)
       const b1 = parseFloat(S.b1) || 0;
       const b2 = parseFloat(S.b2) || 0;
       const tAhorroBs = b1 + b2;
       const tAhorroUsd = bcv ? tAhorroBs / bcv : 0;
       setEl('dash-ahorro-usd', fUSD(tAhorroUsd));
+
+      // ---------------------------------------------------------
+      // GRÁFICO CIRCULAR (DOUGHNUT)
+      // ---------------------------------------------------------
+      if (CH.dash) CH.dash.destroy();
+      
+      const ctx = document.getElementById('ch-dash-resumen');
+      if (!ctx) return;
+
+      // Si no hay datos, mostrar algo gris
+      let chartData = [totalIngresosMes, totalGastosMes];
+      let bgColors = ['rgba(68,201,126, 0.85)', 'rgba(224,92,92, 0.85)'];
+      let borderColors = ['#44c97e', '#e05c5c'];
+
+      if (totalIngresosMes === 0 && totalGastosMes === 0) {
+        chartData = [1];
+        bgColors = ['rgba(255,255,255,0.05)'];
+        borderColors = ['transparent'];
+      }
+
+      CH.dash = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Ingresos Mes', 'Gastos Mes (Fijos + Variables)'],
+          datasets: [{
+            data: chartData,
+            backgroundColor: bgColors,
+            borderColor: borderColors,
+            borderWidth: 1,
+            hoverOffset: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '75%',
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  if (totalIngresosMes === 0 && totalGastosMes === 0) return 'Sin datos';
+                  return `${ctx.label}: $ ${N(ctx.raw)}`;
+                }
+              }
+            }
+          }
+        }
+      });
     }
 
 
