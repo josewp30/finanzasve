@@ -127,13 +127,14 @@
       // 2. SINCRONIZACIÓN EN SEGUNDO PLANO (Nube)
       setSyncState('loading', 'Sincronizando...');
       try {
-        const [resTasas, resFijos, resCfg, resGastos, resSal, resIngresos] = await Promise.all([
+        const [resTasas, resFijos, resCfg, resGastos, resSal, resIngresos, resDeudas] = await Promise.all([
           apiGet('getTasas').catch(e => { console.error('getTasas err:', e); return { status: 'err' }; }),
           apiGet('getGastosFijos').catch(e => { console.error('getGastosFijos err:', e); return { status: 'err' }; }),
           apiGet('getConfig').catch(e => { console.error('getConfig err:', e); return { status: 'err' }; }),
           apiGet('getGastos').catch(e => { console.error('getGastos err:', e); return { status: 'err' }; }),
           apiGet('getSalarios').catch(e => { console.error('getSalarios err:', e); return { status: 'err' }; }),
-          apiGet('getIngresos').catch(e => { console.error('getIngresos err:', e); return { status: 'err' }; })
+          apiGet('getIngresos').catch(e => { console.error('getIngresos err:', e); return { status: 'err' }; }),
+          apiGet('getDeudas').catch(e => { console.error('getDeudas err:', e); return { status: 'err' }; })
         ]);
         console.log("=== DB SYNC RESULTS ===");
         console.log("Tasas:", resTasas);
@@ -161,7 +162,6 @@
         }
         if (resSal.status === 'ok') {
           S.salarios = resSal.data.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
-
           const ultimo = S.salarios[0];
           if (ultimo) {
             S.salario = parseFloat(ultimo.salario_bs) || S.salario || 0;
@@ -173,6 +173,9 @@
               S.bcvDate = ultimo.fecha || '';
             }
           }
+        }
+        if (resDeudas && resDeudas.status === 'ok') {
+          S.deudas = resDeudas.data;
         }
 
         // Tasa activa: la más reciente del historial tiene prioridad sobre todo
@@ -200,6 +203,8 @@
         renderGastos();
         renderGastosFijos();
         renderIngresos();
+        renderDeudas();
+        renderDashboard();
         setSyncState('ok');
       } catch (err) {
         setSyncState('err', 'Modo local');
@@ -330,6 +335,7 @@
       salarios: [],       // caché historial
       tasaVista: 0,       // tasa seleccionada para vista histórica
       ingresos: [],       // caché ingresos extras
+      deudas: [],         // caché de deudas
     };
     let CH = {};
     const LS_KEY = 'fve4';
@@ -397,6 +403,16 @@
             .select('*')
             .eq('user_id', uid)
             .eq('activo', true);
+          if (error) throw error;
+          return { status: 'ok', data: data || [] };
+        }
+
+        if (accion === 'getDeudas') {
+          const { data, error } = await sb.from('deudas')
+            .select('*')
+            .eq('user_id', uid)
+            .eq('activa', true)
+            .order('fecha', { ascending: false });
           if (error) throw error;
           return { status: 'ok', data: data || [] };
         }
@@ -576,6 +592,19 @@
         return { status: 'ok', data: { saved: true, id: data.id } };
       }
 
+      // ── EDITAR REGISTRO ────────────────────────────
+      if (accion === 'editRegistro') {
+        const updateData = { descripcion: body.descripcion, monto_usd: +body.monto_usd };
+        if (body.categoria) updateData.categoria = body.categoria;
+        
+        const { error } = await sb.from(body.table)
+          .update(updateData)
+          .eq('id', body.id)
+          .eq('user_id', uid);
+        if (error) throw error;
+        return { status: 'ok', data: { edited: true } };
+      }
+
       // ── ELIMINAR INGRESO EXTRA ────────────────────────────
       if (accion === 'deleteIngreso') {
         const { error } = await sb.from('ingresos')
@@ -584,6 +613,32 @@
           .eq('user_id', uid); // seguridad: solo borra los propios
         if (error) throw error;
         return { status: 'ok', data: { deleted: true, id: body.id } };
+      }
+
+      // ── GUARDAR DEUDA ────────────────────────────────
+      if (accion === 'saveDeuda') {
+        const { data, error } = await sb.from('deudas')
+          .insert({
+            nombre: body.nombre,
+            tipo: body.tipo,
+            monto_usd: +body.monto_usd,
+            activa: true,
+            user_id: uid,
+          })
+          .select('id')
+          .single();
+        if (error) throw error;
+        return { status: 'ok', data: { saved: true, id: data.id } };
+      }
+
+      // ── ELIMINAR DEUDA ────────────────────────────────
+      if (accion === 'deleteDeuda') {
+        const { error } = await sb.from('deudas')
+          .delete()
+          .eq('id', body.id)
+          .eq('user_id', uid);
+        if (error) throw error;
+        return { status: 'ok', data: { deleted: true } };
       }
 
       throw new Error('apiPost acción desconocida: ' + accion);
@@ -1107,6 +1162,7 @@
           const idxLocal = S.gastos.findIndex(g => g.id === gasto.id);
           if (idxLocal >= 0) S.gastos[idxLocal].id = res.data.id;
           lsSave();
+          renderGastos();
           setSyncState('ok');
         } else {
           setSyncState('err', 'Pendiente de subir');
@@ -1244,6 +1300,7 @@
             Bs.${N(bsDia)}
           </div>
         </div>
+        <button class="btn btn-p btn-sm" onclick="openEditModal('${g.id}', 'gasto')">✎</button>
         <button class="btn btn-d btn-sm" onclick="delGasto('${g.id}')">✕</button>
       </div>`;
         }).join('');
@@ -1433,6 +1490,7 @@
           const idxLocal = S.ingresos.findIndex(i => i.id === ingreso.id);
           if (idxLocal >= 0) S.ingresos[idxLocal].id = res.data.id;
           lsSave();
+          renderIngresos();
           setSyncState('ok');
         } else {
           setSyncState('err', 'Pendiente de subir');
@@ -1553,6 +1611,7 @@
             Bs.${N(bsDia)}
           </div>
         </div>
+        <button class="btn btn-p btn-sm" onclick="openEditModal('${i.id}', 'ingreso')">✎</button>
         <button class="btn btn-d btn-sm" onclick="delIngresoExtra('${i.id}')">✕</button>
       </div>`;
         }).join('');
@@ -1654,6 +1713,7 @@
           const idx = S.gastosFijos.findIndex(g => g.id === fijo.id);
           if (idx >= 0) S.gastosFijos[idx].id = res.data?.id || res.data?.data?.id || fijo.id;
           lsSave();
+          renderGastosFijos();
           setSyncState('ok');
         } else {
           setSyncState('err', 'Pendiente');
@@ -1711,6 +1771,65 @@
       }
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  EDICIÓN DE REGISTROS (Gastos, Ingresos, Fijos)
+    // ═══════════════════════════════════════════════════════════
+    function openEditModal(id, type) {
+      let arr = [], table = '';
+      if (type === 'gasto') { arr = S.gastos; table = 'gastos'; }
+      else if (type === 'fijo') { arr = S.gastosFijos; table = 'gastos_fijos'; }
+      else if (type === 'ingreso') { arr = S.ingresos; table = 'ingresos'; }
+      else return;
+
+      const item = arr.find(x => x.id === id);
+      if (!item) return;
+
+      document.getElementById('edit-id').value = id;
+      document.getElementById('edit-type').value = table;
+      document.getElementById('edit-desc').value = item.descripcion || '';
+      document.getElementById('edit-monto').value = parseFloat(item.monto_usd) || 0;
+      
+      const catEl = document.getElementById('edit-cat');
+      if (catEl) catEl.value = item.categoria || '';
+
+      document.getElementById('modal-edit').classList.add('open');
+    }
+
+    async function saveEdit() {
+      const id = document.getElementById('edit-id').value;
+      const table = document.getElementById('edit-type').value;
+      const desc = document.getElementById('edit-desc').value.trim();
+      const monto = parseFloat(document.getElementById('edit-monto').value) || 0;
+      const cat = document.getElementById('edit-cat').value.trim();
+
+      if (!desc || !monto) { alert('Completa la descripción y el monto.'); return; }
+      
+      // Update local array
+      let arr = [], renderFunc = null;
+      if (table === 'gastos') { arr = S.gastos; renderFunc = renderGastos; }
+      else if (table === 'gastos_fijos') { arr = S.gastosFijos; renderFunc = renderGastosFijos; }
+      else if (table === 'ingresos') { arr = S.ingresos; renderFunc = renderIngresos; }
+      
+      const idx = arr.findIndex(x => x.id === id);
+      if (idx >= 0) {
+        arr[idx].descripcion = desc;
+        arr[idx].monto_usd = monto;
+        if (cat) arr[idx].categoria = cat;
+        lsSave();
+        renderFunc();
+        renderAhorro();
+      }
+      closeModal('modal-edit');
+      
+      setSyncState('loading', 'Guardando cambios...');
+      try {
+        const res = await apiPost('editRegistro', { table, id, descripcion: desc, monto_usd: monto, categoria: cat });
+        if (res && res.status === 'ok') setSyncState('ok');
+      } catch (err) {
+        setSyncState('err', 'Sin conexión — cambios locales');
+      }
+    }
+
     function renderGastosFijos() {
       const fijos = S.gastosFijos || [];
       const empty = document.getElementById('gf-empty');
@@ -1737,6 +1856,7 @@
           <div class="mono teal" style="font-weight:500;">${fUSD(usd)}</div>
           <div class="mono gold xs">Bs. ${N(bs)}</div>
         </div>
+        <button class="btn btn-p btn-sm" onclick="openEditModal('${g.id}', 'fijo')">✎</button>
         <button class="btn btn-d btn-sm" onclick="delGastoFijo('${g.id}')">✕</button>
       </div>`;
         }).join('');
@@ -2253,6 +2373,8 @@
       if (pid === 'fijos') renderGastosFijos();
       if (pid === 'ingresos') renderIngresos();
       if (pid === 'ahorro') renderAhorro();
+      if (pid === 'deudas') renderDeudas();
+      if (pid === 'inicio') renderDashboard();
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -2334,6 +2456,137 @@
       document.getElementById('update-banner')?.classList.remove('show');
       setTimeout(() => window.location.reload(), 300);
     }
+    // ═══════════════════════════════════════════════════════════
+    //  DEUDAS
+    // ═══════════════════════════════════════════════════════════
+    async function addDeuda() {
+      const nombre = document.getElementById('deuda-nombre').value.trim();
+      const monto = parseFloat(document.getElementById('deuda-monto').value) || 0;
+      const tipo = document.getElementById('deuda-tipo').value;
+
+      if (!nombre || !monto) { alert('Completa nombre y monto.'); return; }
+
+      const d = { id: 'deu_' + Date.now(), nombre, monto_usd: monto, tipo, activa: true, fecha: new Date().toISOString() };
+      S.deudas = S.deudas || [];
+      S.deudas.unshift(d);
+      lsSave();
+      renderDeudas();
+      renderDashboard();
+
+      document.getElementById('deuda-nombre').value = '';
+      document.getElementById('deuda-monto').value = '';
+
+      setSyncState('loading', 'Guardando deuda...');
+      try {
+        const res = await apiPost('saveDeuda', { nombre, tipo, monto_usd: monto });
+        if (res && res.status === 'ok') {
+          const idx = S.deudas.findIndex(x => x.id === d.id);
+          if (idx >= 0) S.deudas[idx].id = res.data.id;
+          lsSave();
+          renderDeudas();
+          setSyncState('ok');
+        } else {
+          setSyncState('err', 'Pendiente');
+        }
+      } catch {
+        setSyncState('err', 'Sin conexión — guardado local');
+      }
+    }
+
+    async function delDeudaLocal(id) {
+      if (!confirm('¿Eliminar esta deuda?')) return;
+      S.deudas = S.deudas.filter(d => d.id !== id);
+      lsSave();
+      renderDeudas();
+      renderDashboard();
+
+      setSyncState('loading', 'Eliminando...');
+      try {
+        const res = await apiPost('deleteDeuda', { id });
+        if (res && res.status === 'ok') setSyncState('ok');
+      } catch {
+        setSyncState('err', 'Sin conexión');
+      }
+    }
+
+    function renderDeudas() {
+      const deudas = S.deudas || [];
+      const listC = document.getElementById('deudas-cobrar-list');
+      const listP = document.getElementById('deudas-pagar-list');
+      const bcv = S.bcv || 0;
+
+      if (!listC || !listP) return;
+
+      const htmlDeuda = (d) => {
+        const usd = parseFloat(d.monto_usd) || 0;
+        const bs = usd * bcv;
+        return `<div style="display:flex;align-items:center;gap:.7rem;background:var(--navy3);border-radius:8px;padding:.65rem .9rem;margin-bottom:.4rem;">
+          <div style="flex:1;">
+            <div style="font-size:.85rem;font-weight:600;">${d.nombre || ''}</div>
+            <div class="xs muted">${String(d.fecha || '').split('T')[0]}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="mono teal" style="font-weight:500;">${fUSD(usd)}</div>
+            <div class="mono gold xs">Bs. ${N(bs)}</div>
+          </div>
+          <button class="btn btn-d btn-sm" onclick="delDeudaLocal('${d.id}')">✕</button>
+        </div>`;
+      };
+
+      const cobrar = deudas.filter(d => d.tipo === 'cobrar');
+      const pagar = deudas.filter(d => d.tipo === 'pagar');
+
+      listC.innerHTML = cobrar.length ? cobrar.map(htmlDeuda).join('') : '<div class="muted small" style="text-align:center;padding:1rem;">No hay cuentas por cobrar</div>';
+      listP.innerHTML = pagar.length ? pagar.map(htmlDeuda).join('') : '<div class="muted small" style="text-align:center;padding:1rem;">No hay cuentas por pagar</div>';
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  DASHBOARD (INICIO)
+    // ═══════════════════════════════════════════════════════════
+    function renderDashboard() {
+      const elBalUsd = document.getElementById('dash-balance-usd');
+      if (!elBalUsd) return; // Not on DOM
+
+      const bcv = S.bcv || 0;
+
+      // Gastos Fijos
+      const totFijosUsd = (S.gastosFijos || []).reduce((a, b) => a + (parseFloat(b.monto_usd) || 0), 0);
+      setEl('dash-fijos-usd', fUSD(totFijosUsd));
+      setEl('dash-fijos-bs', `Bs. ${N(totFijosUsd * bcv)}`);
+
+      // Ingresos Extras Totales
+      const totIngUsd = (S.ingresos || []).reduce((a, b) => a + (parseFloat(b.monto_usd) || 0), 0);
+      
+      // Salario Activo
+      let totSalUsd = 0;
+      if (S.salarios && S.salarios.length) {
+        const last = S.salarios[0];
+        totSalUsd = parseFloat(last.total_usd) || 0;
+      }
+
+      // Gastos Variables Acumulados
+      const totGUsd = (S.gastos || []).reduce((a, b) => a + (parseFloat(b.monto_usd) || 0), 0);
+
+      // Balance General: (Ingresos + Salario) - GastosFijos - GastosVariables
+      const balanceUsd = (totSalUsd + totIngUsd) - (totFijosUsd + totGUsd);
+      elBalUsd.textContent = fUSD(balanceUsd);
+      setEl('dash-balance-bs', `Bs. ${N(balanceUsd * bcv)}`);
+
+      // Deudas
+      const cobrarUsd = (S.deudas || []).filter(d => d.tipo === 'cobrar').reduce((a, b) => a + (parseFloat(b.monto_usd) || 0), 0);
+      const pagarUsd = (S.deudas || []).filter(d => d.tipo === 'pagar').reduce((a, b) => a + (parseFloat(b.monto_usd) || 0), 0);
+      
+      setEl('dash-cobrar', fUSD(cobrarUsd));
+      setEl('dash-pagar', fUSD(pagarUsd));
+
+      // Ahorro
+      const b1 = parseFloat(S.b1) || 0;
+      const b2 = parseFloat(S.b2) || 0;
+      const tAhorroBs = b1 + b2;
+      const tAhorroUsd = bcv ? tAhorroBs / bcv : 0;
+      setEl('dash-ahorro-usd', fUSD(tAhorroUsd));
+    }
+
 
     (function initPWA() {
       // Ícono canvas para Apple

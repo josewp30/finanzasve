@@ -98,8 +98,10 @@
     <div class="layout">
       <nav class="sidebar">
         <div class="nav-sec">Principal</div>
-        <button class="nav-btn active" onclick="nav(this,'resumen')"><span class="ic">◈</span><span
-            class="nav-lbl">Resumen</span></button>
+        <button class="nav-btn active" onclick="nav(this,'inicio')"><span class="ic">🏠</span><span
+            class="nav-lbl">Inicio</span></button>
+        <button class="nav-btn" onclick="nav(this,'resumen')"><span class="ic">◈</span><span
+            class="nav-lbl">Mi Día</span></button>
         <div class="nav-sec">Pagos</div>
         <button class="nav-btn" onclick="nav(this,'semanal')"><span class="ic">▦</span><span
             class="nav-lbl">Calendario</span></button>
@@ -117,6 +119,8 @@
             class="nav-lbl">Tasas</span></button>
         <button class="nav-btn" onclick="nav(this,'hsalarios')"><span class="ic">💼</span><span
             class="nav-lbl">Salarios</span></button>
+        <button class="nav-btn" onclick="nav(this,'deudas')"><span class="ic">🤝</span><span
+            class="nav-lbl">Deudas</span></button>
         <div class="nav-sec">Ajustes</div>
         <button class="nav-btn" onclick="nav(this,'config')"><span class="ic">⚙</span><span
             class="nav-lbl">Configuración</span></button>
@@ -224,7 +228,46 @@
         <!-- ═══════════════════════════════════════════════
          RESUMEN
     ════════════════════════════════════════════════ -->
-        <div class="page active" id="page-resumen">
+        <div class="page active" id="page-inicio">
+          <div class="pg-title">Panel de Inicio</div>
+          <div class="g2" style="margin-bottom: 1rem;">
+            <div class="kpi" style="--ac:var(--blue)">
+              <div class="kpi-icon">💰</div>
+              <div class="kpi-body">
+                <div class="kpi-lbl">Balance Total Disponible</div>
+                <div class="kpi-val teal" id="dash-balance-usd">$ 0.00</div>
+                <div class="kpi-sub gold" id="dash-balance-bs">Bs. 0.00</div>
+              </div>
+            </div>
+            <div class="kpi" style="--ac:var(--purple)">
+              <div class="kpi-icon">📌</div>
+              <div class="kpi-body">
+                <div class="kpi-lbl">Gastos Fijos Pendientes</div>
+                <div class="kpi-val orange" id="dash-fijos-usd">$ 0.00</div>
+                <div class="kpi-sub gold" id="dash-fijos-bs">Bs. 0.00</div>
+              </div>
+            </div>
+          </div>
+          <div class="g2">
+            <div class="panel">
+              <h4>🤝 Deudas</h4>
+              <div style="display:flex;justify-content:space-between;margin-top:.5rem;">
+                <span class="muted">Me deben:</span>
+                <span class="teal" id="dash-cobrar">$ 0.00</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;margin-top:.2rem;">
+                <span class="muted">Debo:</span>
+                <span class="red" id="dash-pagar">$ 0.00</span>
+              </div>
+            </div>
+            <div class="panel">
+              <h4>◎ Ahorro Acumulado</h4>
+              <div style="font-size:1.5rem;font-family:monospace;color:var(--green);margin-top:.5rem;" id="dash-ahorro-usd">$ 0.00</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="page" id="page-resumen">
           <div class="pg-title">Resumen Mensual</div>
           <div class="pg-sub">Consolidado de ingresos. <span style="color:var(--teal);">USD primario</span> · <span
               style="color:var(--gold2);">Bs. referencia</span></div>
@@ -679,8 +722,10 @@
     ════════════════════════════════════════════════ -->
         <div class="page" id="page-hsalarios">
           <div class="pg-title">Historial de Salarios</div>
-          <div class="pg-sub">Cada vez que guardas tu configuración se registra un snapshot con la tasa BCV del día.
+          <div class="panel" style="margin-bottom: 1rem;">
+            <canvas id="ch-sal" width="400" height="200"></canvas>
           </div>
+          <div class="info t">Cada vez que guardas en la pantalla principal, se registra una foto de tu salario y los bonos a esa fecha, junto con la tasa activa.</div>
 
           <div class="g3" style="margin-bottom:1.2rem;">
             <div class="kpi" style="--ac:var(--blue)">
@@ -716,6 +761,38 @@
           </div>
         </div>
 
+        <!-- ════════════════════════════════════════════════
+         DEUDAS
+    ════════════════════════════════════════════════ -->
+        <div class="page" id="page-deudas">
+          <div class="pg-title">Gestión de Deudas</div>
+          <div class="info t">Lleva el control de quienes te deben dinero y a quienes les debes. Todo se registra en USD y su valor en Bs. se actualiza con la tasa BCV del día.</div>
+
+          <div class="panel" style="margin-bottom: 1.5rem;">
+            <h4>Añadir Nueva Deuda</h4>
+            <div class="fld"><label>Nombre / Entidad</label><input type="text" id="deuda-nombre" placeholder="Ej. Juan Pérez"></div>
+            <div class="fld"><label>Monto (USD)</label><input type="number" id="deuda-monto" step="0.01" placeholder="0.00"></div>
+            <div class="fld"><label>Tipo de Deuda</label>
+              <select id="deuda-tipo">
+                <option value="cobrar">Me deben dinero (Por Cobrar)</option>
+                <option value="pagar">Yo debo dinero (Por Pagar)</option>
+              </select>
+            </div>
+            <button class="btn btn-p" onclick="addDeuda()">+ Añadir Deuda</button>
+          </div>
+
+          <div class="g2">
+            <div>
+              <h4 style="margin-bottom:.8rem;color:var(--blue);">Me deben (Por Cobrar)</h4>
+              <div id="deudas-cobrar-list"></div>
+            </div>
+            <div>
+              <h4 style="margin-bottom:.8rem;color:var(--red);">Debo (Por Pagar)</h4>
+              <div id="deudas-pagar-list"></div>
+            </div>
+          </div>
+        </div>
+
       </main>
     </div>
 
@@ -742,6 +819,30 @@
         <button class="btn btn-s" onclick="closeModal('modal-bcv')">Cancelar</button>
       </div>
       <div id="m-status" style="display:none;margin-top:.8rem;font-size:.8rem;padding:.6rem .9rem;border-radius:8px;">
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+     MODAL: EDITAR REGISTRO
+════════════════════════════════════════════════ -->
+  <div class="overlay" id="modal-edit">
+    <div class="modal">
+      <h3>✎ Editar Registro</h3>
+      <input type="hidden" id="edit-id">
+      <input type="hidden" id="edit-type">
+      <div class="fld"><label>Descripción / Nombre</label>
+        <input type="text" id="edit-desc">
+      </div>
+      <div class="fld"><label>Monto (USD)</label>
+        <input type="number" id="edit-monto" step="0.01">
+      </div>
+      <div class="fld" id="edit-cat-wrapper"><label>Categoría</label>
+        <input type="text" id="edit-cat">
+      </div>
+      <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem;">
+        <button class="btn btn-p" onclick="saveEdit()">✓ Guardar</button>
+        <button class="btn btn-s" onclick="closeModal('modal-edit')">Cancelar</button>
       </div>
     </div>
   </div>
@@ -808,6 +909,16 @@
     </div>
   </div>
 
+  <script>
+    window.addEventListener('error', function(e) {
+      const msg = document.getElementById('loading-msg');
+      if (msg) msg.innerHTML += '<br>Error: ' + e.message + ' at ' + e.lineno;
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      const msg = document.getElementById('loading-msg');
+      if (msg) msg.innerHTML += '<br>Promise Error: ' + (e.reason && e.reason.message || e.reason);
+    });
+  </script>
   <script src="main.js"></script>
 </body>
 
