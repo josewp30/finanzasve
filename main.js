@@ -94,7 +94,7 @@
         }
 
         // Sanitizar y asegurar arrays
-        ['gastos', 'gastosFijos', 'tasasHistoricas', 'salarios', 'deletedGastos', 'deletedFijos', 'ingresos'].forEach(k => { if (!Array.isArray(S[k])) S[k] = []; });
+        ['gastos', 'gastosFijos', 'tasasHistoricas', 'salarios', 'deletedGastos', 'deletedFijos', 'ingresos', 'deudas'].forEach(k => { if (!Array.isArray(S[k])) S[k] = []; });
 
         // Poblar Inputs para que liveCalc funcione
         const setV = (id, v) => { const e = document.getElementById(id); if (e) e.value = v || ''; };
@@ -146,21 +146,23 @@
         console.log("CurrentUser ID:", currentUser?.id);
         console.log("=======================");
 
-        if (resTasas.status === 'ok') S.tasasHistoricas = resTasas.data.sort((a, b) => b.fecha.localeCompare(a.fecha));
-        if (resFijos.status === 'ok') {
+        if (resTasas.status === 'ok' && Array.isArray(resTasas.data)) {
+          S.tasasHistoricas = resTasas.data.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+        }
+        if (resFijos.status === 'ok' && Array.isArray(resFijos.data)) {
           S.gastosFijos = resFijos.data;
         }
         if (resCfg.status === 'ok' && resCfg.data) {
           if (resCfg.data.bcv) S.bcv = parseFloat(resCfg.data.bcv);
           if (resCfg.data.bcvDate) S.bcvDate = resCfg.data.bcvDate;
         }
-        if (resGastos.status === 'ok') {
+        if (resGastos.status === 'ok' && Array.isArray(resGastos.data)) {
           S.gastos = resGastos.data;
         }
-        if (resIngresos.status === 'ok') {
+        if (resIngresos.status === 'ok' && Array.isArray(resIngresos.data)) {
           S.ingresos = resIngresos.data;
         }
-        if (resSal.status === 'ok') {
+        if (resSal.status === 'ok' && Array.isArray(resSal.data)) {
           S.salarios = resSal.data.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
           const ultimo = S.salarios[0];
           if (ultimo) {
@@ -174,7 +176,7 @@
             }
           }
         }
-        if (resDeudas && resDeudas.status === 'ok') {
+        if (resDeudas && resDeudas.status === 'ok' && Array.isArray(resDeudas.data)) {
           S.deudas = resDeudas.data;
         }
 
@@ -195,19 +197,26 @@
 
         // Guardar lo nuevo y refrescar UI sin bloquear al usuario
         lsSave();
-        updateHdr();
-        liveCalc();
-        renderResumen();
-        renderSemanal();
-        renderAhorro();
-        renderGastos();
-        renderGastosFijos();
-        renderIngresos();
-        renderDeudas();
-        renderDashboard();
+        
+        // Cada render en su propio try-catch para que un error en uno no impida los demás
+        const safeRender = (fn, name) => { try { fn(); } catch(e) { console.warn('Render error in ' + name + ':', e); } };
+        safeRender(updateHdr, 'updateHdr');
+        safeRender(liveCalc, 'liveCalc');
+        safeRender(renderResumen, 'renderResumen');
+        safeRender(renderSemanal, 'renderSemanal');
+        safeRender(renderAhorro, 'renderAhorro');
+        safeRender(renderGastos, 'renderGastos');
+        safeRender(renderGastosFijos, 'renderGastosFijos');
+        safeRender(renderIngresos, 'renderIngresos');
+        safeRender(renderDeudas, 'renderDeudas');
+        safeRender(renderDashboard, 'renderDashboard');
+        
         setSyncState('ok');
       } catch (err) {
-        setSyncState('err', 'Modo local');
+        console.error("Boot sync error:", err);
+        // Incluso si hay un error de sync, intentar renderizar lo que se pueda con datos locales
+        try { updateHdr(); liveCalc(); renderResumen(); } catch(e) { console.warn('Fallback render err:', e); }
+        setSyncState('err', err.message || 'Error de sincronización');
       } finally {
         isInitializing = false;
       }
@@ -748,7 +757,7 @@
       const idx = S.tasasHistoricas.findIndex(t => t.fecha === fecha);
       if (idx >= 0) S.tasasHistoricas[idx].tasa = tasa;
       else S.tasasHistoricas.unshift({ fecha, tasa, fuente: 'BCV Oficial' });
-      S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+      S.tasasHistoricas.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
       
       S.bcv = tasa; S.bcvDate = fecha; lsSave(); updateHdr(); liveCalc();
       
@@ -789,7 +798,7 @@
         const idx = S.tasasHistoricas.findIndex(t => t.fecha === d);
         if (idx >= 0) S.tasasHistoricas[idx].tasa = r;
         else S.tasasHistoricas.unshift({ fecha: d, tasa: r, fuente: 'BCV Oficial' });
-        S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+        S.tasasHistoricas.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
         
         S.bcv = r; S.bcvDate = d; lsSave(); updateHdr(); liveCalc();
         
@@ -1068,7 +1077,7 @@
       if (resultado && resultado.rate > 0) {
         // Guardar automáticamente en historial local y Sheets
         S.tasasHistoricas.unshift({ fecha: resultado.fecha, tasa: resultado.rate, fuente: resultado.fuente });
-        S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+        S.tasasHistoricas.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
         lsSave();
         try { await apiPost('saveTasa', { fecha: resultado.fecha, tasa: resultado.rate, fuente: resultado.fuente }); } catch { }
         poblarSelectorTasas();
@@ -1092,7 +1101,7 @@
       const t = parseFloat(document.getElementById('g-tasa-manual').value) || 0;
       if (!t || !fecha) return;
       S.tasasHistoricas.unshift({ fecha, tasa: t, fuente: 'Manual' });
-      S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+      S.tasasHistoricas.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
       lsSave(); poblarSelectorTasas();
       try { await apiPost('saveTasa', { fecha, tasa: t, fuente: 'Manual' }); } catch { }
       setTasaBox('manual', t, fecha, '✓ Tasa manual guardada');
@@ -1406,7 +1415,7 @@
       const resultado = await fetchTasaHistoricaAPI(fecha);
       if (resultado && resultado.rate > 0) {
         S.tasasHistoricas.unshift({ fecha: resultado.fecha, tasa: resultado.rate, fuente: resultado.fuente });
-        S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+        S.tasasHistoricas.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
         lsSave();
         try { await apiPost('saveTasa', { fecha: resultado.fecha, tasa: resultado.rate, fuente: resultado.fuente }); } catch { }
         poblarSelectorTasas();
@@ -1430,7 +1439,7 @@
       const t = parseFloat(document.getElementById('ing-tasa-manual').value) || 0;
       if (!t || !fecha) return;
       S.tasasHistoricas.unshift({ fecha, tasa: t, fuente: 'Manual' });
-      S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+      S.tasasHistoricas.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
       lsSave(); poblarSelectorTasas();
       try { await apiPost('saveTasa', { fecha, tasa: t, fuente: 'Manual' }); } catch { }
       setIngTasaBox('manual', t, fecha, '✓ Tasa manual guardada');
@@ -1778,13 +1787,14 @@
     }
 
     // ═══════════════════════════════════════════════════════════
-    //  EDICIÓN DE REGISTROS (Gastos, Ingresos, Fijos)
+    //  EDICIÓN DE REGISTROS (Gastos, Ingresos, Fijos, Deudas)
     // ═══════════════════════════════════════════════════════════
     function openEditModal(id, type) {
       let arr = [], table = '';
       if (type === 'gasto') { arr = S.gastos; table = 'gastos'; }
       else if (type === 'fijo') { arr = S.gastosFijos; table = 'gastos_fijos'; }
       else if (type === 'ingreso') { arr = S.ingresos; table = 'ingresos'; }
+      else if (type === 'deuda') { arr = S.deudas; table = 'deudas'; }
       else return;
 
       const item = arr.find(x => x.id === id);
@@ -1792,11 +1802,20 @@
 
       document.getElementById('edit-id').value = id;
       document.getElementById('edit-type').value = table;
-      document.getElementById('edit-desc').value = item.descripcion || '';
+      document.getElementById('edit-desc').value = item.descripcion || item.nombre || '';
       document.getElementById('edit-monto').value = parseFloat(item.monto_usd) || 0;
       
       const catEl = document.getElementById('edit-cat');
       if (catEl) catEl.value = item.categoria || '';
+
+      const catWrapper = document.getElementById('edit-cat-wrapper');
+      if (catWrapper) {
+        if (type === 'deuda') {
+          catWrapper.style.display = 'none';
+        } else {
+          catWrapper.style.display = 'block';
+        }
+      }
 
       document.getElementById('modal-edit').classList.add('open');
     }
@@ -2111,7 +2130,7 @@
           S.tasasHistoricas = res.data
             .map(t => ({ fecha: String(t.fecha || ''), tasa: parseFloat(t.tasa) || 0, fuente: t.fuente || 'BCV' }))
             .filter(t => t.fecha && t.tasa > 0)
-            .sort((a, b) => b.fecha.localeCompare(a.fecha));
+            .sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
           lsSave();
           setSyncState('ok');
           poblarSelectorTasas();
@@ -2208,7 +2227,7 @@
         const idx = S.tasasHistoricas.findIndex(t => t.fecha === resultado.fecha);
         if (idx >= 0) S.tasasHistoricas[idx].tasa = resultado.rate;
         else S.tasasHistoricas.unshift({ fecha: resultado.fecha, tasa: resultado.rate, fuente: resultado.fuente || 'API BCV' });
-        S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+        S.tasasHistoricas.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
         lsSave(); 
         renderTasasList(); 
         poblarSelectorTasas();
@@ -2265,7 +2284,7 @@
       const idx = S.tasasHistoricas.findIndex(item => item.fecha === fecha);
       if (idx >= 0) S.tasasHistoricas[idx].tasa = t;
       else S.tasasHistoricas.unshift({ fecha, tasa: t, fuente: 'Manual' });
-      S.tasasHistoricas.sort((a, b) => b.fecha.localeCompare(a.fecha));
+      S.tasasHistoricas.sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
       lsSave(); renderTasasList(); poblarSelectorTasas();
       
       try {
@@ -2532,8 +2551,6 @@
       const htmlDeuda = (d) => {
         const usd = parseFloat(d.monto_usd) || 0;
         const bs = usd * bcv;
-        // Escapamos comillas simples/dobles por seguridad en el onclick
-        const safeNombre = (d.nombre || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         return `<div style="display:flex;align-items:center;gap:.7rem;background:var(--navy3);border-radius:8px;padding:.65rem .9rem;margin-bottom:.4rem;">
           <div style="flex:1;">
             <div style="font-size:.85rem;font-weight:600;">${d.nombre || ''}</div>
@@ -2543,7 +2560,7 @@
             <div class="mono teal" style="font-weight:500;">${fUSD(usd)}</div>
             <div class="mono gold xs">Bs. ${N(bs)}</div>
           </div>
-          <button class="btn btn-sm" style="background:var(--navy2);border:1px solid rgba(255,255,255,.1);" onclick="openEditModal('deudas', '${d.id}', '${safeNombre}', ${usd})">✎</button>
+          <button class="btn btn-sm" style="background:var(--navy2);border:1px solid rgba(255,255,255,.1);" onclick="openEditModal('${d.id}', 'deuda')">✎</button>
           <button class="btn btn-d btn-sm" onclick="delDeudaLocal('${d.id}')">✕</button>
         </div>`;
       };

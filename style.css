@@ -997,6 +997,69 @@
     }
 
     /* SALARY HISTORY */
+    /* DASHBOARD POWER BI STYLE */
+    .dash-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.2rem;
+      margin-bottom: 1.5rem;
+    }
+    .dash-card {
+      background: var(--navy2);
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      position: relative;
+      overflow: hidden;
+    }
+    .dash-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--ac, var(--blue));
+    }
+    .dash-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text2);
+      font-weight: 600;
+      margin-bottom: 0.8rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .dash-main-val {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text);
+      font-family: 'IBM Plex Mono', monospace;
+      line-height: 1;
+    }
+    .dash-sub-val {
+      font-size: 0.9rem;
+      color: var(--gold2);
+      font-family: 'IBM Plex Mono', monospace;
+      margin-top: 0.4rem;
+      opacity: 0.8;
+    }
+    .dash-chart-container {
+      background: var(--navy2);
+      border-radius: 12px;
+      padding: 1.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.03);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 250px;
+    }
+
     .sal-card {
       background: var(--navy3);
       border-radius: 8px;
@@ -1055,6 +1118,3 @@
         display: none;
       }
     }
-  
-\ n / *   D A S H B O A R D   P O W E R   B I   S T Y L E   * / \ n . d a s h - g r i d   {   d i s p l a y :   g r i d ;   g r i d - t e m p l a t e - c o l u m n s :   r e p e a t ( a u t o - f i t ,   m i n m a x ( 2 8 0 p x ,   1 f r ) ) ;   g a p :   1 . 2 r e m ;   m a r g i n - b o t t o m :   1 . 5 r e m ;   } \ n . d a s h - c a r d   {   b a c k g r o u n d :   v a r ( - - n a v y 2 ) ;   b o r d e r - r a d i u s :   1 2 p x ;   p a d d i n g :   1 . 5 r e m ;   b o x - s h a d o w :   0   4 p x   1 5 p x   r g b a ( 0 , 0 , 0 , 0 . 1 5 ) ;   b o r d e r :   1 p x   s o l i d   r g b a ( 2 5 5 , 2 5 5 , 2 5 5 , 0 . 0 3 ) ;   p o s i t i o n :   r e l a t i v e ;   o v e r f l o w :   h i d d e n ;   } \ n . d a s h - c a r d : : b e f o r e   {   c o n t e n t :   ' ' ;   p o s i t i o n :   a b s o l u t e ;   t o p :   0 ;   l e f t :   0 ;   w i d t h :   4 p x ;   h e i g h t :   1 0 0 % ;   b a c k g r o u n d :   v a r ( - - a c ,   v a r ( - - b l u e ) ) ;   } \ n . d a s h - t i t l e   {   f o n t - s i z e :   0 . 7 5 r e m ;   t e x t - t r a n s f o r m :   u p p e r c a s e ;   l e t t e r - s p a c i n g :   1 p x ;   c o l o r :   v a r ( - - t e x t 2 ) ;   f o n t - w e i g h t :   6 0 0 ;   m a r g i n - b o t t o m :   0 . 8 r e m ;   d i s p l a y :   f l e x ;   a l i g n - i t e m s :   c e n t e r ;   j u s t i f y - c o n t e n t :   s p a c e - b e t w e e n ;   } \ n . d a s h - m a i n - v a l   {   f o n t - s i z e :   2 r e m ;   f o n t - w e i g h t :   7 0 0 ;   c o l o r :   v a r ( - - t e x t ) ;   f o n t - f a m i l y :   ' I B M   P l e x   M o n o ' ,   m o n o s p a c e ;   l i n e - h e i g h t :   1 ;   } \ n . d a s h - s u b - v a l   {   f o n t - s i z e :   0 . 9 r e m ;   c o l o r :   v a r ( - - g o l d 2 ) ;   f o n t - f a m i l y :   ' I B M   P l e x   M o n o ' ,   m o n o s p a c e ;   m a r g i n - t o p :   0 . 4 r e m ;   o p a c i t y :   0 . 8 ;   } \ n . d a s h - c h a r t - c o n t a i n e r   {   b a c k g r o u n d :   v a r ( - - n a v y 2 ) ;   b o r d e r - r a d i u s :   1 2 p x ;   p a d d i n g :   1 . 5 r e m ;   b o r d e r :   1 p x   s o l i d   r g b a ( 2 5 5 , 2 5 5 , 2 5 5 , 0 . 0 3 ) ;   b o x - s h a d o w :   0   4 p x   1 5 p x   r g b a ( 0 , 0 , 0 , 0 . 1 5 ) ;   d i s p l a y :   f l e x ;   f l e x - d i r e c t i o n :   c o l u m n ;   a l i g n - i t e m s :   c e n t e r ;   j u s t i f y - c o n t e n t :   c e n t e r ;   m i n - h e i g h t :   2 5 0 p x ;   } \ n  
- 
